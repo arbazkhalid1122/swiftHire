@@ -69,13 +69,15 @@ UserSchema.pre('save', async function (next) {
     return next();
   }
   const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  const password = this.password as string;
+  this.password = await bcrypt.hash(password, salt);
   next();
 });
 
 // Compare password method
 UserSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
-  return await bcrypt.compare(candidatePassword, this.password);
+  const password = this.password as string;
+  return await bcrypt.compare(candidatePassword, password);
 };
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
