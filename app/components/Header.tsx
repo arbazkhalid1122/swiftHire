@@ -60,6 +60,13 @@ export default function Header() {
     setIsAuthenticated(true);
     setUser(userData);
     setAuthModalOpen(false);
+    
+    // Redirect admins to admin dashboard, regular users to home
+    if (userData?.role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/');
+    }
   };
 
   const handleLogout = () => {
