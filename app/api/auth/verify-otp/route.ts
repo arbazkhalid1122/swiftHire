@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
             name: user.name,
             email: user.email,
             isVerified: user.isVerified,
+            role: user.role,
           },
         },
         { status: 200 }
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
             name: user.name,
             email: user.email,
             isVerified: user.isVerified,
+            role: user.role,
           },
         },
         { status: 200 }

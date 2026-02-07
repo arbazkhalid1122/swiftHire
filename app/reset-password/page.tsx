@@ -3,9 +3,11 @@
 import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '../components/Header';
+import { useToast } from '../contexts/ToastContext';
 
 function ResetPasswordForm() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -106,7 +108,7 @@ function ResetPasswordForm() {
         return;
       }
 
-      alert('Password reset successfully! You can now login.');
+      showToast('Password reset successfully! You can now login.', 'success');
       router.push('/');
     } catch (err) {
       setError('Network error. Please try again.');

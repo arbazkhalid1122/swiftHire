@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Newsletter from '@/models/Newsletter';
 import { sendNewsletterConfirmation } from '@/lib/email';
+import { logActivity } from '@/lib/activityLog';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,6 +33,19 @@ export async function POST(request: NextRequest) {
         await existing.save();
 
         await sendNewsletterConfirmation(email);
+
+        // Log activity
+        await logActivity({
+          userId: 'system',
+          userEmail: email.toLowerCase(),
+          action: 'newsletter_subscribed',
+          resource: 'newsletter',
+          resourceId: existing._id.toString(),
+          details: { action: 'resubscribed' },
+          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
+          userAgent: request.headers.get('user-agent') || undefined,
+        });
+
         return NextResponse.json(
           { message: 'Successfully resubscribed to newsletter' },
           { status: 200 }
@@ -49,6 +63,17 @@ export async function POST(request: NextRequest) {
 
     // Send confirmation email
     await sendNewsletterConfirmation(email);
+
+    // Log activity
+    await logActivity({
+      userId: 'system',
+      userEmail: email.toLowerCase(),
+      action: 'newsletter_subscribed',
+      resource: 'newsletter',
+      resourceId: newsletter._id.toString(),
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
+    });
 
     return NextResponse.json(
       {

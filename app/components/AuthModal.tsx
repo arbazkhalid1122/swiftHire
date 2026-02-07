@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '../contexts/ToastContext';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showOTP, setShowOTP] = useState(false);
   const [otpEmail, setOtpEmail] = useState('');
@@ -131,7 +133,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         onSuccess(data.token, data.user);
       }
 
-      alert(data.message || 'Verifica completata con successo!');
+      showToast(data.message || 'Verifica completata con successo!', 'success');
       onClose();
       setShowOTP(false);
       setOtpEmail('');

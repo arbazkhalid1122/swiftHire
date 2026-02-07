@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import { useRouter } from 'next/navigation';
+import { useToast } from '../contexts/ToastContext';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isEditMode, setIsEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,7 +100,7 @@ export default function ProfilePage() {
       }
 
       setIsEditMode(false);
-      alert('Profilo aggiornato con successo!');
+      showToast('Profilo aggiornato con successo!', 'success');
     } catch (err) {
       setError('Network error. Please try again.');
     } finally {

@@ -24,6 +24,11 @@ export default function Header() {
   useEffect(() => {
     // Close mobile menu when route changes
     setMobileMenuOpen(false);
+    // Refresh user data when route changes (in case role changed)
+    const token = localStorage.getItem('token');
+    if (token && isAuthenticated) {
+      fetchUserData(token);
+    }
   }, [pathname]);
 
   const fetchUserData = async (token: string) => {
@@ -36,9 +41,17 @@ export default function Header() {
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
+        console.log('User data fetched:', data.user); // Debug log
+      } else {
+        // If unauthorized, clear auth state
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          setIsAuthenticated(false);
+          setUser(null);
+        }
       }
     } catch (err) {
-      console.error('Failed to fetch user data');
+      console.error('Failed to fetch user data:', err);
     }
   };
 
@@ -75,23 +88,48 @@ export default function Header() {
           <Link href="/" className={isActive('/') ? 'active' : ''}>
             Home
           </Link>
-          <Link href="/jobs" className={isActive('/jobs') ? 'active' : ''}>
-            Cerca Lavoro
-          </Link>
-          <Link href="/companies" className={isActive('/companies') ? 'active' : ''}>
-            Aziende
-          </Link>
-          <Link href="/post-job" className="btn-post">
-            <i className="fas fa-plus"></i> <span className="nav-text">Pubblica</span>
-          </Link>
-          <Link href="/video-cv" className="btn-video">
-            <i className="fas fa-video"></i> <span className="nav-text">Video CV</span>
-          </Link>
-          <Link href="/messages" className="btn-video">
-            <i className="fas fa-comments"></i> <span className="nav-text">Messaggi</span>
-          </Link>
           {isAuthenticated ? (
             <>
+              <Link href="/profile" className={isActive('/profile') ? 'active' : ''}>
+                Profilo
+              </Link>
+              {user?.role === 'admin' && (
+                <Link 
+                  href="/admin" 
+                  className={isActive('/admin') ? 'active' : ''}
+                  style={{ 
+                    background: 'var(--primary)', 
+                    color: 'white', 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: 'var(--radius-lg)',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <i className="fas fa-cog"></i>
+                  Admin Dashboard
+                </Link>
+              )}
+              {user?.role === 'admin' && (
+                <span style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: '0.75rem',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}>
+                  <i className="fas fa-crown"></i>
+                  Admin
+                </span>
+              )}
               <Link href="/profile" className="user-avatar" title={user?.name || 'Profilo'}>
                 {user?.name?.charAt(0).toUpperCase() || <i className="fas fa-user"></i>}
               </Link>
@@ -138,26 +176,31 @@ export default function Header() {
             <Link href="/" className={isActive('/') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
               <i className="fas fa-home"></i> Home
             </Link>
-            <Link href="/jobs" className={isActive('/jobs') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
-              <i className="fas fa-briefcase"></i> Cerca Lavoro
-            </Link>
-            <Link href="/companies" className={isActive('/companies') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
-              <i className="fas fa-building"></i> Aziende
-            </Link>
-            <Link href="/post-job" onClick={() => setMobileMenuOpen(false)}>
-              <i className="fas fa-plus"></i> Pubblica Annuncio
-            </Link>
-            <Link href="/video-cv" onClick={() => setMobileMenuOpen(false)}>
-              <i className="fas fa-video"></i> Video CV
-            </Link>
-            <Link href="/messages" onClick={() => setMobileMenuOpen(false)}>
-              <i className="fas fa-comments"></i> Messaggi
-            </Link>
             {isAuthenticated ? (
               <>
-                <Link href="/profile" onClick={() => setMobileMenuOpen(false)}>
+                <Link href="/profile" className={isActive('/profile') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
                   <i className="fas fa-user"></i> Profilo
                 </Link>
+                {user?.role === 'admin' && (
+                  <Link 
+                    href="/admin" 
+                    className={isActive('/admin') ? 'active' : ''} 
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{
+                      background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
+                      color: 'white',
+                      fontWeight: '700',
+                      padding: '0.75rem 1rem',
+                      borderRadius: 'var(--radius-lg)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      margin: '0.5rem 0'
+                    }}
+                  >
+                    <i className="fas fa-cog"></i> Admin Dashboard
+                  </Link>
+                )}
                 <button onClick={handleLogout} className="mobile-nav-button">
                   <i className="fas fa-sign-out-alt"></i> Logout
                 </button>

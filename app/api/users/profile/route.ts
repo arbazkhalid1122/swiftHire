@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
           location: user.location,
           bio: user.bio,
           isVerified: user.isVerified,
+          role: user.role,
           createdAt: user.createdAt,
         },
       },
@@ -88,6 +89,7 @@ export async function PUT(request: NextRequest) {
           location: user.location,
           bio: user.bio,
           isVerified: user.isVerified,
+          role: user.role,
         },
       },
       { status: 200 }
