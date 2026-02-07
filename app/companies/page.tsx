@@ -7,6 +7,7 @@ import Link from 'next/link';
 export default function CompaniesPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [cvType, setCvType] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const filterCandidatesByCategory = (category: string) => {
     setSelectedCategory(category);
@@ -26,17 +27,36 @@ export default function CompaniesPage() {
   return (
     <>
       <Header />
-      <div className="main-container" style={{ display: 'block' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '20px', alignItems: 'start' }}>
+      <div className="main-container">
+        {/* Filter Overlay for Mobile */}
+        <div 
+          className={`filters-overlay ${showFilters ? 'active' : ''}`}
+          onClick={() => setShowFilters(false)}
+        ></div>
+
+        <div className="jobs-layout">
           {/* FILTRI CATEGORIE A SINISTRA */}
-          <div className="filters" style={{ position: 'sticky', top: '100px' }}>
-            <h3 style={{ color: 'var(--cyan)', fontSize: '0.9rem', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className={`filters filters-sidebar ${showFilters ? 'mobile-open' : ''}`}>
+            <div className="filters-header-mobile">
+              <h3>
+                <i className="fas fa-users"></i> CATEGORIE
+              </h3>
+              <button 
+                className="mobile-filters-close"
+                onClick={() => setShowFilters(false)}
+                aria-label="Close filters"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <h3 style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <i className="fas fa-users"></i> CATEGORIE CANDIDATI
             </h3>
             
             {/* Categorie Lavorative */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '10px' }}>💼 CATEGORIA</label>
+              <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>💼 CATEGORIA</label>
               <div className="filter-tags-vertical">
                 <span
                   className={`filter-tag-sidebar ${selectedCategory === 'all' ? 'active' : ''}`}
@@ -91,7 +111,7 @@ export default function CompaniesPage() {
 
             {/* Tipo CV */}
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '10px' }}>📄 TIPO CV</label>
+              <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>📄 TIPO CV</label>
               <div className="filter-tags-vertical">
                 <span
                   className={`filter-tag-sidebar ${cvType === 'all' ? 'active' : ''}`}
@@ -116,24 +136,53 @@ export default function CompaniesPage() {
           </div>
 
           {/* RISULTATI A DESTRA */}
-          <div>
-            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-              <h2 style={{ color: 'var(--cyan)', fontSize: '1.2rem', margin: '0' }}>👥 Candidati Disponibili</h2>
-              <p style={{ color: '#999', marginTop: '10px', fontSize: '0.9rem' }}>{candidates.length} candidati trovati</p>
+          <div className="jobs-results">
+            <div className="jobs-results-header">
+              <div>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: '1.2rem', margin: '0', fontWeight: '700' }}>👥 Candidati Disponibili</h2>
+                <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontSize: '0.9rem' }}>{candidates.length} candidati trovati</p>
+              </div>
+              <button 
+                className="mobile-filters-toggle"
+                onClick={() => setShowFilters(!showFilters)}
+                aria-label="Toggle filters"
+              >
+                <i className="fas fa-filter"></i> Filtri
+              </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
+            <div className="jobs-grid">
               {candidates.map((candidate) => (
-                <div key={candidate.id} className="job-card" style={{ margin: '0' }}>
+                <div key={candidate.id} className="job-card">
                   <div className="job-card-body">
-                    <h3 className="job-title">{candidate.name}</h3>
-                    <p className="job-company">Categoria: {candidate.category}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                      <div className="avatar-circle" style={{ 
+                        background: `linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)`,
+                        width: '60px', 
+                        height: '60px', 
+                        borderRadius: '50%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        color: 'white', 
+                        fontWeight: '700',
+                        fontSize: '1.5rem',
+                        boxShadow: 'var(--shadow-md)'
+                      }}>
+                        {candidate.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="job-title" style={{ marginBottom: '0.25rem' }}>{candidate.name}</h3>
+                        <p className="job-company">Categoria: {candidate.category}</p>
+                      </div>
+                    </div>
                     {candidate.hasVideoCV && (
-                      <span className="job-tag">
+                      <span className="job-tag" style={{ marginBottom: '1rem', display: 'inline-block' }}>
                         <i className="fas fa-video"></i> Video CV Disponibile
                       </span>
                     )}
-                    <Link href={`/candidates/${candidate.id}`} className="btn-submit" style={{ marginTop: '10px', textAlign: 'center', display: 'block' }}>
+                    <Link href={`/candidates/${candidate.id}`} className="btn-submit" style={{ marginTop: '0.75rem', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+                      <i className="fas fa-user" style={{ marginRight: '0.5rem' }}></i>
                       Visualizza Profilo
                     </Link>
                   </div>
@@ -146,4 +195,3 @@ export default function CompaniesPage() {
     </>
   );
 }
-

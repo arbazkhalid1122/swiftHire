@@ -10,6 +10,7 @@ export default function JobsPage() {
   const [distance, setDistance] = useState(50);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedExperience, setSelectedExperience] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const allJobs = getAllJobs();
 
@@ -40,7 +41,7 @@ export default function JobsPage() {
   return (
     <>
       <Header />
-      <div className="main-container" style={{ display: 'block' }}>
+      <div className="main-container">
         {/* DISTANCE FILTER AT TOP CENTER */}
         <div className="distance-filter-top">
           <div className="distance-header">
@@ -73,10 +74,25 @@ export default function JobsPage() {
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '20px', alignItems: 'start' }}>
+        {/* Filter Overlay for Mobile */}
+        <div 
+          className={`filters-overlay ${showFilters ? 'active' : ''}`}
+          onClick={() => setShowFilters(false)}
+        ></div>
+
+        <div className="jobs-layout">
           {/* FILTRI A SINISTRA */}
-          <div className="filters" style={{ position: 'sticky', top: '100px' }}>
-            <h3>🔍 FILTRI RICERCA</h3>
+          <div className={`filters filters-sidebar ${showFilters ? 'mobile-open' : ''}`}>
+            <div className="filters-header-mobile">
+              <h3>🔍 FILTRI RICERCA</h3>
+              <button 
+                className="mobile-filters-close"
+                onClick={() => setShowFilters(false)}
+                aria-label="Close filters"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
             
             <div className="filter-grid">
               <div className="filter-item">
@@ -131,13 +147,22 @@ export default function JobsPage() {
           </div>
 
           {/* RISULTATI A DESTRA */}
-          <div>
-            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-              <h2 style={{ color: 'var(--cyan)', fontSize: '1.2rem', margin: '0' }}>🔥 Risultati Ricerca</h2>
-              <p style={{ color: '#999', marginTop: '10px', fontSize: '0.9rem' }}>{allJobs.length} opportunità trovate</p>
+          <div className="jobs-results">
+            <div className="jobs-results-header">
+              <div>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: '1.2rem', margin: '0', fontWeight: '700' }}>🔥 Risultati Ricerca</h2>
+                <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontSize: '0.9rem' }}>{allJobs.length} opportunità trovate</p>
+              </div>
+              <button 
+                className="mobile-filters-toggle"
+                onClick={() => setShowFilters(!showFilters)}
+                aria-label="Toggle filters"
+              >
+                <i className="fas fa-filter"></i> Filtri
+              </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
+            <div className="jobs-grid">
               {allJobs.map((job) => (
                 <JobCard key={job.id} {...job} />
               ))}
@@ -148,4 +173,3 @@ export default function JobsPage() {
     </>
   );
 }
-

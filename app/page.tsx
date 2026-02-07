@@ -53,7 +53,7 @@ export default function Home() {
           
           {/* SEARCH BAR */}
           <div className="search-container">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '1rem', alignItems: 'center' }}>
+            <div className="search-grid">
               <div className="search-input-group">
                 <i className="fas fa-briefcase"></i>
                 <input
