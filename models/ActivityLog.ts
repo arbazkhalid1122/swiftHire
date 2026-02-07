@@ -34,6 +34,7 @@ const ActivityLogSchema: Schema = new Schema(
         'newsletter_subscribed',
         'newsletter_unsubscribed',
         'newsletter_deleted',
+        'newsletter_sent',
         'login',
         'logout',
         'password_reset',

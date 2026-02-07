@@ -108,3 +108,35 @@ export async function sendNewsletterConfirmation(email: string) {
   }
 }
 
+export async function sendNewsletterUpdate(email: string, subject: string, content: string) {
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+          <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">SwiftHire Pro</h1>
+          </div>
+          <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
+            <div style="background: white; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
+              ${content}
+            </div>
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+              <p style="color: #64748b; font-size: 12px; margin: 0;">
+                Questo messaggio è stato inviato a tutti gli iscritti alla newsletter di SwiftHire Pro.<br>
+                Se non desideri più ricevere questi aggiornamenti, puoi disiscriverti dalla newsletter.
+              </p>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error sending newsletter update:', error);
+    return false;
+  }
+}
+

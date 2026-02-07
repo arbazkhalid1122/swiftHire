@@ -13,18 +13,31 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showOTP, setShowOTP] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [otpEmail, setOtpEmail] = useState('');
   const [otpType, setOtpType] = useState<'registration' | 'login' | 'password-reset'>('registration');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
+      // Reset all states when modal closes
+      setShowOTP(false);
+      setShowPasswordReset(false);
+      setOtpEmail('');
+      setOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setError('');
+      setMessage('');
+      setActiveTab('login');
     }
     return () => {
       document.body.style.overflow = 'unset';
@@ -52,16 +65,31 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
       if (!response.ok) {
         setError(data.error || 'Login failed');
+        showToast(data.error || 'Login failed', 'error');
         setLoading(false);
         return;
       }
 
+      // If user is verified, skip OTP and directly log them in
+      if (data.skipOTP && data.token && data.user) {
+        localStorage.setItem('token', data.token);
+        showToast('Login successful!', 'success');
+        if (onSuccess) {
+          onSuccess(data.token, data.user);
+        }
+        onClose();
+        return;
+      }
+
+      // If user is not verified, show OTP screen
       setOtpEmail(email);
       setOtpType('login');
       setShowOTP(true);
       setMessage('OTP inviato alla tua email. Controlla e inserisci il codice.');
+      showToast('OTP inviato alla tua email', 'info');
     } catch (err) {
       setError('Errore di rete. Riprova.');
+      showToast('Errore di rete. Riprova.', 'error');
     } finally {
       setLoading(false);
     }
@@ -88,8 +116,24 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Registrazione fallita');
+        // Show error and don't proceed to OTP if user already exists or other error
+        const errorMsg = data.error || 'Registrazione fallita';
+        setError(errorMsg);
+        showToast(errorMsg, 'error');
         setLoading(false);
+        // If user already exists, suggest they login instead
+        if (data.error && data.error.includes('already exists')) {
+          setTimeout(() => {
+            setActiveTab('login');
+            setError('');
+            // Pre-fill email in login form
+            const loginEmailInput = document.querySelector('#auth-login input[name="email"]') as HTMLInputElement;
+            if (loginEmailInput) {
+              loginEmailInput.value = email;
+              setOtpEmail(email);
+            }
+          }, 2000);
+        }
         return;
       }
 
@@ -99,8 +143,11 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       setMessage('Registrazione completata! OTP inviato alla tua email. Verifica per continuare.');
     } catch (err) {
       setError('Errore di rete. Riprova.');
-    } finally {
       setLoading(false);
+    } finally {
+      if (!error) {
+        setLoading(false);
+      }
     }
   };
 
@@ -133,11 +180,23 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
         onSuccess(data.token, data.user);
       }
 
+      // Handle password reset flow
+      if (otpType === 'password-reset' && data.verified) {
+        setShowOTP(false);
+        setShowPasswordReset(true);
+        setMessage('OTP verificato. Inserisci la nuova password.');
+        setOtp('');
+        return;
+      }
+
       showToast(data.message || 'Verifica completata con successo!', 'success');
       onClose();
       setShowOTP(false);
+      setShowPasswordReset(false);
       setOtpEmail('');
       setOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (err) {
       setError('Errore di rete. Riprova.');
     } finally {
@@ -146,9 +205,17 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
   };
 
   const handleForgotPassword = async () => {
-    if (!otpEmail) {
-      setError('Inserisci prima la tua email');
-      return;
+    // Get email from login form if not already set
+    let emailToUse = otpEmail;
+    if (!emailToUse) {
+      const emailInput = document.querySelector('input[name="email"]') as HTMLInputElement;
+      if (emailInput && emailInput.value) {
+        emailToUse = emailInput.value;
+      } else {
+        setError('Inserisci prima la tua email nel campo email');
+        showToast('Inserisci la tua email per recuperare la password', 'warning');
+        return;
+      }
     }
 
     setLoading(true);
@@ -159,28 +226,176 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: otpEmail }),
+        body: JSON.stringify({ email: emailToUse }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         setError(data.error || 'Invio OTP fallito');
+        showToast(data.error || 'Invio OTP fallito', 'error');
         setLoading(false);
         return;
       }
 
+      setOtpEmail(emailToUse);
       setOtpType('password-reset');
       setShowOTP(true);
       setMessage('OTP inviato alla tua email per il reset della password.');
+      showToast('OTP inviato alla tua email', 'success');
     } catch (err) {
       setError('Errore di rete. Riprova.');
+      showToast('Errore di rete. Riprova.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      setError('Le password non corrispondono');
+      showToast('Le password non corrispondono', 'error');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('La password deve essere di almeno 6 caratteri');
+      showToast('La password deve essere di almeno 6 caratteri', 'error');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: otpEmail, otp, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Reset password fallito');
+        showToast(data.error || 'Reset password fallito', 'error');
+        setLoading(false);
+        return;
+      }
+
+      showToast('Password resettata con successo! Ora puoi accedere.', 'success');
+      // Reset all states and close modal
+      setShowPasswordReset(false);
+      setShowOTP(false);
+      setOtpEmail('');
+      setOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setActiveTab('login');
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err) {
+      setError('Errore di rete. Riprova.');
+      showToast('Errore di rete. Riprova.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   if (!isOpen) return null;
+
+  if (showPasswordReset) {
+    return (
+      <div className="modal-overlay active" onClick={onClose}>
+        <div className="auth-container" onClick={(e) => e.stopPropagation()}>
+          <div className="auth-close" onClick={() => { 
+            setShowPasswordReset(false); 
+            setOtpEmail(''); 
+            setNewPassword('');
+            setConfirmPassword('');
+          }}>
+            <i className="fas fa-times"></i>
+          </div>
+          
+          <div className="auth-form-container">
+            <h2>Reset Password</h2>
+            <p className="subtitle">Inserisci la nuova password per {otpEmail}</p>
+
+            {error && (
+              <div style={{ 
+                color: 'var(--error)', 
+                marginBottom: '1rem', 
+                padding: '0.75rem', 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid rgba(239, 68, 68, 0.2)'
+              }}>
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordReset}>
+              <div className="auth-form-group">
+                <label>Nuova Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="auth-form-group">
+                <label>Conferma Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <button type="submit" className="btn-auth btn-auth-primary" disabled={loading || newPassword.length < 6 || newPassword !== confirmPassword}>
+                {loading ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    Reset in corso...
+                  </>
+                ) : (
+                  'Reset Password'
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="btn-auth btn-auth-secondary"
+                onClick={() => {
+                  setShowPasswordReset(false);
+                  setShowOTP(true);
+                }}
+                style={{ marginTop: '0.75rem' }}
+              >
+                Torna indietro
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showOTP) {
     return (
@@ -257,16 +472,19 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                 )}
               </button>
 
-              {otpType === 'login' && (
-                <button
-                  type="button"
-                  className="btn-auth btn-auth-secondary"
-                  onClick={handleForgotPassword}
-                  style={{ marginTop: '0.75rem' }}
-                >
-                  Password dimenticata?
-                </button>
-              )}
+              <button
+                type="button"
+                className="btn-auth btn-auth-secondary"
+                onClick={() => {
+                  setShowOTP(false);
+                  setOtp('');
+                  setError('');
+                  setMessage('');
+                }}
+                style={{ marginTop: '0.75rem' }}
+              >
+                Torna al login
+              </button>
             </form>
           </div>
         </div>
@@ -344,9 +562,32 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                 <input type="password" name="password" placeholder="••••••••" required />
               </div>
 
-              <div className="checkbox-group">
-                <input type="checkbox" id="remember" />
-                <label htmlFor="remember">Ricordami</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div className="checkbox-group">
+                  <input type="checkbox" id="remember" />
+                  <label htmlFor="remember">Ricordami</label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const emailInput = (document.querySelector('input[name="email"]') as HTMLInputElement)?.value;
+                    if (emailInput) {
+                      setOtpEmail(emailInput);
+                    }
+                    handleForgotPassword();
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary)',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                >
+                  Password dimenticata?
+                </button>
               </div>
 
               <button type="submit" className="btn-auth btn-auth-primary" disabled={loading}>

@@ -27,12 +27,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'User with this email already exists' },
-        { status: 400 }
-      );
+      if (existingUser.isVerified) {
+        return NextResponse.json(
+          { error: 'User with this email already exists and is verified. Please login instead.' },
+          { status: 400 }
+        );
+      } else {
+        return NextResponse.json(
+          { error: 'User with this email already exists but is not verified. Please check your email for the verification OTP or contact support.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Create user (not verified yet)
