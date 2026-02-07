@@ -7,7 +7,7 @@ import { logActivity } from '@/lib/activityLog';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { email: string } }
+  { params }: { params: Promise<{ email: string }> }
 ) {
   try {
     await connectDB();
@@ -29,7 +29,8 @@ export async function DELETE(
       );
     }
 
-    const email = decodeURIComponent(params.email);
+    const { email: emailParam } = await params;
+    const email = decodeURIComponent(emailParam);
 
     // Find and delete subscriber
     const subscriber = await Newsletter.findOne({ email: email.toLowerCase() });
@@ -48,7 +49,7 @@ export async function DELETE(
     // Log activity
     await logActivity({
       userId: auth.userId,
-      userEmail: adminUser.email,
+      userEmail: user.email,
       action: 'newsletter_deleted',
       resource: 'newsletter',
       resourceId: subscriber._id.toString(),

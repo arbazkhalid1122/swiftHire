@@ -36,10 +36,12 @@ export async function GET(request: NextRequest) {
     const collections = await db?.listCollections().toArray();
     const collectionStats: any[] = [];
 
-    if (collections) {
+    if (collections && db) {
       for (const collection of collections) {
-        const stats = await db?.collection(collection.name).stats();
-        const count = await db?.collection(collection.name).countDocuments();
+        const collectionObj = db.collection(collection.name);
+        // Use type assertion for stats() method which exists but TypeScript types may not include
+        const stats = await (collectionObj as any).stats();
+        const count = await collectionObj.countDocuments();
         collectionStats.push({
           name: collection.name,
           count,

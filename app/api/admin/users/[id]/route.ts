@@ -6,7 +6,7 @@ import { logActivity } from '@/lib/activityLog';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
@@ -27,7 +27,8 @@ export async function GET(
       );
     }
 
-    const user = await User.findById(params.id).select('-password');
+    const { id } = await params;
+    const user = await User.findById(id).select('-password');
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -47,7 +48,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
@@ -68,7 +69,8 @@ export async function PUT(
       );
     }
 
-    const user = await User.findById(params.id);
+    const { id } = await params;
+    const user = await User.findById(id);
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -142,7 +144,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
@@ -163,15 +165,17 @@ export async function DELETE(
       );
     }
 
+    const { id } = await params;
+
     // Prevent deleting yourself
-    if (params.id === auth.userId) {
+    if (id === auth.userId) {
       return NextResponse.json(
         { error: 'Cannot delete your own account' },
         { status: 400 }
       );
     }
 
-    const user = await User.findById(params.id);
+    const user = await User.findById(id);
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -184,7 +188,7 @@ export async function DELETE(
       name: user.name,
     };
 
-    await User.findByIdAndDelete(params.id);
+    await User.findByIdAndDelete(id);
 
     // Log activity
     await logActivity({
@@ -192,7 +196,7 @@ export async function DELETE(
       userEmail: adminUser.email,
       action: 'user_deleted',
       resource: 'user',
-      resourceId: params.id,
+      resourceId: id,
       details: userData,
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
