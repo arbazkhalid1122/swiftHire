@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
-import OTP from '@/models/OTP';
-import { generateOTP } from '@/lib/utils';
-import { sendOTPEmail } from '@/lib/email';
+import { generateJWT } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,31 +21,23 @@ export async function POST(request: NextRequest) {
     if (!user) {
       // Don't reveal if user exists for security
       return NextResponse.json(
-        { message: 'If the email exists, an OTP has been sent.' },
+        { message: 'If the email exists, a password reset token has been generated.' },
         { status: 200 }
       );
     }
 
-    // Generate and save OTP
-    const otp = generateOTP();
-    const otpExpiry = new Date();
-    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10); // 10 minutes expiry
-
-    const otpDoc = new OTP({
+    // Generate a simple reset token (JWT that expires in 1 hour)
+    const resetToken = generateJWT({
+      userId: user._id.toString(),
       email: user.email,
-      otp,
       type: 'password-reset',
-      expiresAt: otpExpiry,
     });
 
-    await otpDoc.save();
-
-    // Send OTP email
-    await sendOTPEmail(user.email, otp, 'password-reset');
-
+    // Return token (in production, this would be sent via email)
     return NextResponse.json(
       {
-        message: 'If the email exists, an OTP has been sent to reset your password.',
+        message: 'Password reset token generated. Use this token to reset your password.',
+        resetToken, // In production, send this via email instead
       },
       { status: 200 }
     );

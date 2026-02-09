@@ -2,9 +2,9 @@
 
 :root {
   /* Modern Color Palette */
-  --primary: #6366f1;
-  --primary-dark: #4f46e5;
-  --primary-light: #818cf8;
+  --primary: #800000;
+  --primary-dark: #660000;
+  --primary-light: #990000;
   --secondary: #ec4899;
   --accent: #f59e0b;
   --success: #10b981;
@@ -34,10 +34,10 @@
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  --gradient-hero: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  --gradient-primary: linear-gradient(135deg, #800000 0%, #990000 100%);
+  --gradient-secondary: linear-gradient(135deg, #990000 0%, #b30000 100%);
+  --gradient-accent: linear-gradient(135deg, #800000 0%, #cc0000 100%);
+  --gradient-hero: linear-gradient(135deg, #800000 0%, #990000 50%, #b30000 100%);
   
   /* Spacing */
   --spacing-xs: 0.25rem;

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
-import OTP from '@/models/OTP';
-import { generateOTP, generateJWT } from '@/lib/utils';
-import { sendOTPEmail } from '@/lib/email';
+import { generateJWT } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,53 +34,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If user is already verified, skip OTP and directly log them in
-    if (user.isVerified) {
-      // Generate JWT token directly
-      const token = generateJWT({
-        userId: user._id.toString(),
-        email: user.email,
-      });
-
-      return NextResponse.json(
-        {
-          message: 'Login successful',
-          token,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            isVerified: user.isVerified,
-            role: user.role,
-          },
-          skipOTP: true, // Flag to indicate OTP was skipped
-        },
-        { status: 200 }
-      );
+    // Auto-verify user if not already verified
+    if (!user.isVerified) {
+      user.isVerified = true;
+      await user.save();
     }
 
-    // If user is not verified, send OTP (first time signup verification)
-    const otp = generateOTP();
-    const otpExpiry = new Date();
-    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10); // 10 minutes expiry
-
-    const otpDoc = new OTP({
+    // Generate JWT token directly
+    const token = generateJWT({
+      userId: user._id.toString(),
       email: user.email,
-      otp,
-      type: 'login',
-      expiresAt: otpExpiry,
     });
-
-    await otpDoc.save();
-
-    // Send OTP email
-    await sendOTPEmail(user.email, otp, 'login');
 
     return NextResponse.json(
       {
-        message: 'OTP sent to your email. Please verify to complete login.',
-        email: user.email,
-        skipOTP: false, // Flag to indicate OTP is required
+        message: 'Login successful',
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          isVerified: user.isVerified,
+          role: user.role,
+          userType: user.userType,
+        },
       },
       { status: 200 }
     );

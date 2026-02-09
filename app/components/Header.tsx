@@ -61,9 +61,13 @@ export default function Header() {
     setUser(userData);
     setAuthModalOpen(false);
     
-    // Redirect admins to admin dashboard, regular users to home
+    // Redirect based on user type
     if (userData?.role === 'admin') {
       router.push('/admin');
+    } else if (userData?.userType === 'company') {
+      router.push('/company');
+    } else if (userData?.userType === 'candidate') {
+      router.push('/candidate');
     } else {
       router.push('/');
     }
@@ -100,6 +104,82 @@ export default function Header() {
               <Link href="/profile" className={isActive('/profile') ? 'active' : ''}>
                 Profilo
               </Link>
+              {user?.userType === 'company' && (
+                <>
+                  <Link 
+                    href="/company" 
+                    className={isActive('/company') ? 'active' : ''}
+                    style={{ 
+                      background: 'var(--primary)', 
+                      color: 'white', 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: 'var(--radius-lg)',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <i className="fas fa-building"></i>
+                    Dashboard Azienda
+                  </Link>
+                  <Link 
+                    href="/messages" 
+                    className={isActive('/messages') ? 'active' : ''}
+                    style={{ 
+                      color: 'var(--text-primary)', 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: 'var(--radius-lg)',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      position: 'relative'
+                    }}
+                  >
+                    <i className="fas fa-envelope"></i>
+                    Messaggi
+                  </Link>
+                </>
+              )}
+              {user?.userType === 'candidate' && (
+                <>
+                  <Link 
+                    href="/candidate" 
+                    className={isActive('/candidate') ? 'active' : ''}
+                    style={{ 
+                      background: 'var(--primary)', 
+                      color: 'white', 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: 'var(--radius-lg)',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <i className="fas fa-user"></i>
+                    Dashboard Candidato
+                  </Link>
+                  <Link 
+                    href="/messages" 
+                    className={isActive('/messages') ? 'active' : ''}
+                    style={{ 
+                      color: 'var(--text-primary)', 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: 'var(--radius-lg)',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      position: 'relative'
+                    }}
+                  >
+                    <i className="fas fa-envelope"></i>
+                    Messaggi
+                  </Link>
+                </>
+              )}
               {user?.role === 'admin' && (
                 <Link 
                   href="/admin" 
@@ -188,6 +268,80 @@ export default function Header() {
                 <Link href="/profile" className={isActive('/profile') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
                   <i className="fas fa-user"></i> Profilo
                 </Link>
+                {user?.userType === 'company' && (
+                  <>
+                    <Link 
+                      href="/company" 
+                      className={isActive('/company') ? 'active' : ''} 
+                      onClick={() => setMobileMenuOpen(false)}
+                      style={{
+                        background: 'var(--primary)',
+                        color: 'white',
+                        fontWeight: '700',
+                        padding: '0.75rem 1rem',
+                        borderRadius: 'var(--radius-lg)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        margin: '0.5rem 0'
+                      }}
+                    >
+                      <i className="fas fa-building"></i> Dashboard Azienda
+                    </Link>
+                    <Link 
+                      href="/messages" 
+                      className={isActive('/messages') ? 'active' : ''} 
+                      onClick={() => setMobileMenuOpen(false)}
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontWeight: '600',
+                        padding: '0.75rem 1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <i className="fas fa-envelope"></i> Messaggi
+                    </Link>
+                  </>
+                )}
+                {user?.userType === 'candidate' && (
+                  <>
+                    <Link 
+                      href="/candidate" 
+                      className={isActive('/candidate') ? 'active' : ''} 
+                      onClick={() => setMobileMenuOpen(false)}
+                      style={{
+                        background: 'var(--primary)',
+                        color: 'white',
+                        fontWeight: '700',
+                        padding: '0.75rem 1rem',
+                        borderRadius: 'var(--radius-lg)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        margin: '0.5rem 0'
+                      }}
+                    >
+                      <i className="fas fa-user"></i> Dashboard Candidato
+                    </Link>
+                    <Link 
+                      href="/messages" 
+                      className={isActive('/messages') ? 'active' : ''} 
+                      onClick={() => setMobileMenuOpen(false)}
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontWeight: '600',
+                        padding: '0.75rem 1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <i className="fas fa-envelope"></i> Messaggi
+                    </Link>
+                  </>
+                )}
                 {user?.role === 'admin' && (
                   <Link 
                     href="/admin" 

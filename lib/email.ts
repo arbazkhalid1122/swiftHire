@@ -116,7 +116,7 @@ export async function sendNewsletterUpdate(email: string, subject: string, conte
       subject: subject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
-          <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background: linear-gradient(135deg, #800000 0%, #990000 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
             <h1 style="color: white; margin: 0; font-size: 24px;">SwiftHire Pro</h1>
           </div>
           <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -136,6 +136,50 @@ export async function sendNewsletterUpdate(email: string, subject: string, conte
     return true;
   } catch (error) {
     console.error('Error sending newsletter update:', error);
+    return false;
+  }
+}
+
+export async function sendJobNotificationEmail(email: string, job: any) {
+  try {
+    const jobUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/jobs/${job._id}`;
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: `Nuova opportunità di lavoro: ${job.title} - SwiftHire Pro`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+          <div style="background: linear-gradient(135deg, #800000 0%, #990000 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">SwiftHire Pro</h1>
+          </div>
+          <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
+            <div style="background: white; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="color: #800000; margin-top: 0;">Nuova opportunità di lavoro per te!</h2>
+              <h3 style="color: #1e293b; margin-bottom: 10px;">${job.title}</h3>
+              ${job.location ? `<p style="color: #64748b; margin: 5px 0;"><i class="fas fa-map-marker-alt"></i> ${job.location}</p>` : ''}
+              ${job.jobType ? `<p style="color: #64748b; margin: 5px 0;"><i class="fas fa-briefcase"></i> ${job.jobType}</p>` : ''}
+              <div style="margin: 20px 0; padding: 15px; background: #f8fafc; border-radius: 8px;">
+                <p style="color: #1e293b; line-height: 1.6; margin: 0;">${job.description.substring(0, 300)}${job.description.length > 300 ? '...' : ''}</p>
+              </div>
+              ${job.requirements?.minExperience ? `<p style="color: #64748b; margin: 5px 0;"><strong>Esperienza richiesta:</strong> ${job.requirements.minExperience} anni</p>` : ''}
+              ${job.requirements?.education ? `<p style="color: #64748b; margin: 5px 0;"><strong>Titolo di studio:</strong> ${job.requirements.education}</p>` : ''}
+              <a href="${jobUrl}" style="background: #800000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0;">
+                Visualizza Annuncio
+              </a>
+            </div>
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+              <p style="color: #64748b; font-size: 12px; margin: 0;">
+                Questa email ti è stata inviata perché il tuo profilo corrisponde ai requisiti di questa posizione.<br>
+                Buona fortuna con la tua candidatura!
+              </p>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error sending job notification email:', error);
     return false;
   }
 }

@@ -22,7 +22,7 @@ export default function AdminJobs() {
     if (isAdmin) {
       fetchJobs();
     }
-  }, [isAdmin]);
+  }, [isAdmin, searchTerm]);
 
   const checkAuth = async () => {
     try {
@@ -62,12 +62,26 @@ export default function AdminJobs() {
 
   const fetchJobs = async () => {
     try {
-      // TODO: Implement API endpoint for fetching jobs
-      // For now, using mock data
-      setJobs([]);
-      setLoading(false);
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+
+      const response = await fetch(`/api/admin/jobs?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setJobs(data.jobs || []);
+      } else {
+        showToast('Failed to fetch jobs', 'error');
+      }
     } catch (err) {
       showToast('Failed to fetch jobs', 'error');
+    } finally {
       setLoading(false);
     }
   };
@@ -183,11 +197,11 @@ export default function AdminJobs() {
                     </td>
                   </tr>
                 ) : (
-                  jobs.map((job) => (
+                  jobs.map((job: any) => (
                     <tr key={job._id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '1rem' }}>{job.title}</td>
-                      <td style={{ padding: '1rem' }}>{job.company}</td>
-                      <td style={{ padding: '1rem' }}>{job.location}</td>
+                      <td style={{ padding: '1rem' }}>{job.companyId?.companyName || job.companyId?.name || 'N/A'}</td>
+                      <td style={{ padding: '1rem' }}>{job.location || '-'}</td>
                       <td style={{ padding: '1rem' }}>
                         <span style={{
                           padding: '0.25rem 0.75rem',
@@ -235,10 +249,27 @@ export default function AdminJobs() {
                             <i className="fas fa-edit"></i>
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               if (confirm('Are you sure you want to delete this job?')) {
-                                // TODO: Implement delete
-                                showToast('Delete functionality coming soon', 'info');
+                                try {
+                                  const token = localStorage.getItem('token');
+                                  const response = await fetch(`/api/jobs/${job._id}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                    },
+                                  });
+
+                                  if (response.ok) {
+                                    showToast('Job deleted successfully', 'success');
+                                    fetchJobs();
+                                  } else {
+                                    const data = await response.json();
+                                    showToast(data.error || 'Failed to delete job', 'error');
+                                  }
+                                } catch (err) {
+                                  showToast('Failed to delete job', 'error');
+                                }
                               }
                             }}
                             style={{

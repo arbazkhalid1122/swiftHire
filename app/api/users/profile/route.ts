@@ -34,6 +34,14 @@ export async function GET(request: NextRequest) {
           bio: user.bio,
           isVerified: user.isVerified,
           role: user.role,
+          userType: user.userType,
+          cvUrl: user.cvUrl,
+          videoCvUrl: user.videoCvUrl,
+          education: user.education,
+          skills: user.skills,
+          companyName: user.companyName,
+          companyDescription: user.companyDescription,
+          companyWebsite: user.companyWebsite,
           createdAt: user.createdAt,
         },
       },
@@ -60,7 +68,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { name, phone, location, bio } = await request.json();
+    const { name, phone, location, bio, cvUrl, videoCvUrl, education, skills, companyName, companyDescription, companyWebsite } = await request.json();
 
     const user = await User.findById(auth.userId);
     if (!user) {
@@ -75,6 +83,21 @@ export async function PUT(request: NextRequest) {
     if (phone !== undefined) user.phone = phone;
     if (location !== undefined) user.location = location;
     if (bio !== undefined) user.bio = bio;
+    
+    // Candidate-specific fields
+    if (cvUrl !== undefined) user.cvUrl = cvUrl;
+    if (videoCvUrl !== undefined) user.videoCvUrl = videoCvUrl;
+    if (education !== undefined) user.education = education;
+    if (skills !== undefined) {
+      user.skills = typeof skills === 'string' 
+        ? skills.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        : skills;
+    }
+    
+    // Company-specific fields
+    if (companyName !== undefined) user.companyName = companyName;
+    if (companyDescription !== undefined) user.companyDescription = companyDescription;
+    if (companyWebsite !== undefined) user.companyWebsite = companyWebsite;
 
     await user.save();
 

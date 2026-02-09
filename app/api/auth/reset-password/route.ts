@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
-import OTP from '@/models/OTP';
+import jwt from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    const { email, otp, newPassword } = await request.json();
+    const { resetToken, newPassword } = await request.json();
 
-    if (!email || !otp || !newPassword) {
+    if (!resetToken || !newPassword) {
       return NextResponse.json(
-        { error: 'Email, OTP, and new password are required' },
+        { error: 'Reset token and new password are required' },
         { status: 400 }
       );
     }
@@ -23,24 +23,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify OTP
-    const otpDoc = await OTP.findOne({
-      email: email.toLowerCase(),
-      otp,
-      type: 'password-reset',
-      isUsed: false,
-      expiresAt: { $gt: new Date() },
-    });
-
-    if (!otpDoc) {
+    // Verify reset token
+    let decoded: any;
+    try {
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET || '');
+    } catch (err) {
       return NextResponse.json(
-        { error: 'Invalid or expired OTP' },
+        { error: 'Invalid or expired reset token' },
         { status: 400 }
       );
     }
 
     // Find user
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findById(decoded.userId);
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -51,10 +46,6 @@ export async function POST(request: NextRequest) {
     // Update password
     user.password = newPassword;
     await user.save();
-
-    // Mark OTP as used
-    otpDoc.isUsed = true;
-    await otpDoc.save();
 
     return NextResponse.json(
       {

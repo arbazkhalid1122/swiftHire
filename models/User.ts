@@ -10,6 +10,17 @@ export interface IUser extends Document {
   bio?: string;
   isVerified: boolean;
   role: 'user' | 'admin';
+  userType: 'company' | 'candidate';
+  // Company fields
+  companyName?: string;
+  companyDescription?: string;
+  companyWebsite?: string;
+  // Candidate fields
+  education?: string; // e.g., "Laurea", "Diploma"
+  skills?: string[];
+  cvUrl?: string;
+  videoCvUrl?: string;
+  calculatedExperience?: number; // Calculated years of experience (non-overlapping)
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -56,6 +67,40 @@ const UserSchema: Schema = new Schema(
       type: String,
       enum: ['user', 'admin'],
       default: 'user',
+    },
+    userType: {
+      type: String,
+      enum: ['company', 'candidate'],
+      required: [true, 'User type is required'],
+    },
+    // Company fields
+    companyName: {
+      type: String,
+      trim: true,
+    },
+    companyDescription: {
+      type: String,
+      trim: true,
+    },
+    companyWebsite: {
+      type: String,
+      trim: true,
+    },
+    // Candidate fields
+    education: {
+      type: String,
+      trim: true,
+    },
+    skills: [String],
+    cvUrl: {
+      type: String,
+    },
+    videoCvUrl: {
+      type: String,
+    },
+    calculatedExperience: {
+      type: Number,
+      default: 0,
     },
   },
   {
