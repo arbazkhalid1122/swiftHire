@@ -21,6 +21,19 @@ export interface IUser extends Document {
   cvUrl?: string;
   videoCvUrl?: string;
   calculatedExperience?: number; // Calculated years of experience (non-overlapping)
+  cvExtractedData?: {
+    extractedAt: Date;
+    skills: string[];
+    education: string[];
+    experience: Array<{
+      company?: string;
+      position?: string;
+      duration?: string;
+      description?: string;
+    }>;
+    languages?: string[];
+    certifications?: string[];
+  };
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -92,6 +105,23 @@ const UserSchema: Schema = new Schema(
       trim: true,
     },
     skills: [String],
+    languages: [{
+      name: String,
+      level: String,
+    }],
+    certifications: [{
+      name: String,
+      date: String,
+    }],
+    educationHistory: [{
+      degree: String,
+      institution: String,
+      field: String,
+      startDate: Date,
+      endDate: Date,
+      isCurrent: Boolean,
+      description: String,
+    }],
     cvUrl: {
       type: String,
     },
@@ -101,6 +131,19 @@ const UserSchema: Schema = new Schema(
     calculatedExperience: {
       type: Number,
       default: 0,
+    },
+    cvExtractedData: {
+      extractedAt: Date,
+      skills: [String],
+      education: [String],
+      experience: [{
+        company: String,
+        position: String,
+        duration: String,
+        description: String,
+      }],
+      languages: [String],
+      certifications: [String],
     },
   },
   {

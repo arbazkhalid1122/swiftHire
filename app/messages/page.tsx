@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '../components/Header';
 import { useToast } from '../contexts/ToastContext';
+import { useSocket } from '../contexts/SocketContext';
 
 export default function MessagesListPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -21,6 +23,57 @@ export default function MessagesListPage() {
       fetchConversations();
     }
   }, [user]);
+
+  // Listen for real-time message updates
+  useEffect(() => {
+    if (!socket || !user || !isConnected) return;
+
+    const handleNewMessage = (data: { message: any }) => {
+      const message = data.message;
+      const otherUserId = 
+        message.senderId._id.toString() === user._id 
+          ? message.receiverId._id.toString() 
+          : message.senderId._id.toString();
+      
+      const otherUser = 
+        message.senderId._id.toString() === user._id 
+          ? message.receiverId 
+          : message.senderId;
+
+      setConversations((prev) => {
+        const existingIndex = prev.findIndex((c) => c.userId === otherUserId);
+        
+        if (existingIndex >= 0) {
+          // Update existing conversation
+          const updated = [...prev];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            lastMessage: message,
+            unreadCount: message.receiverId._id.toString() === user._id 
+              ? updated[existingIndex].unreadCount + 1 
+              : updated[existingIndex].unreadCount,
+          };
+          // Move to top
+          const [moved] = updated.splice(existingIndex, 1);
+          return [moved, ...updated];
+        } else {
+          // Add new conversation
+          return [{
+            userId: otherUserId,
+            user: otherUser,
+            lastMessage: message,
+            unreadCount: message.receiverId._id.toString() === user._id ? 1 : 0,
+          }, ...prev];
+        }
+      });
+    };
+
+    socket.on('new_message', handleNewMessage);
+
+    return () => {
+      socket.off('new_message', handleNewMessage);
+    };
+  }, [socket, user, isConnected]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');

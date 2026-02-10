@@ -19,11 +19,11 @@ export default function JobApplicationsPage() {
   }, [params.id]);
 
   useEffect(() => {
-    if (user && params.id) {
+    if (user && params.id && !loading) {
       fetchJob();
       fetchApplications();
     }
-  }, [user, params.id]);
+  }, [user, params.id, loading]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
@@ -48,7 +48,13 @@ export default function JobApplicationsPage() {
         return;
       }
 
-      setUser(data.user);
+      // Ensure user object has both id and _id for compatibility
+      const userData = {
+        ...data.user,
+        _id: data.user._id || data.user.id,
+        id: data.user.id || data.user._id,
+      };
+      setUser(userData);
     } catch (error) {
       router.push('/');
     } finally {
@@ -59,32 +65,34 @@ export default function JobApplicationsPage() {
   const fetchJob = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token || !user) return;
+      
       const response = await fetch(`/api/jobs/${params.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setJob(data.job);
+        const jobData = data.job;
         
-        // Verify ownership
-        if (data.job.companyId._id !== user?._id && user?.role !== 'admin') {
-          showToast('Non autorizzato', 'error');
-          router.push('/company');
-          return;
-        }
+        // Trust the API - if it returns successfully, authorization already passed on server side
+        setJob(jobData);
       } else {
-        showToast('Job not found', 'error');
+        const errorData = await response.json().catch(() => ({}));
+        showToast(errorData.error || 'Job non trovato', 'error');
         router.push('/company');
       }
     } catch (error) {
-      showToast('Error loading job', 'error');
+      console.error('Error loading job:', error);
+      showToast('Errore nel caricamento del job', 'error');
     }
   };
 
   const fetchApplications = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token || !user) return;
+      
       const response = await fetch(`/api/jobs/${params.id}/applications`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -92,9 +100,17 @@ export default function JobApplicationsPage() {
       if (response.ok) {
         const data = await response.json();
         setApplications(data.applications || []);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error fetching applications:', errorData);
+        if (response.status === 401 || response.status === 403) {
+          showToast('Non autorizzato', 'error');
+          router.push('/company');
+        }
       }
     } catch (error) {
       console.error('Error fetching applications:', error);
+      showToast('Errore nel caricamento delle candidature', 'error');
     }
   };
 
@@ -236,16 +252,24 @@ export default function JobApplicationsPage() {
                         <option value="accepted">Accettato</option>
                       </select>
                       <button
-                        onClick={() => sendMessage(app.candidateId._id, app.candidateId.name)}
+                        onClick={() => {
+                          if (app.candidateId?._id) {
+                            sendMessage(app.candidateId._id, app.candidateId.name || 'Candidato');
+                          } else {
+                            showToast('Errore: ID candidato non disponibile', 'error');
+                          }
+                        }}
+                        disabled={!app.candidateId?._id}
                         style={{
                           padding: '0.5rem 1rem',
-                          background: 'var(--primary)',
-                          color: 'white',
+                          background: app.candidateId?._id ? 'var(--primary)' : 'var(--bg-tertiary)',
+                          color: app.candidateId?._id ? 'white' : 'var(--text-tertiary)',
                           border: 'none',
                           borderRadius: 'var(--radius-md)',
-                          cursor: 'pointer',
+                          cursor: app.candidateId?._id ? 'pointer' : 'not-allowed',
                           fontSize: '0.875rem',
                           whiteSpace: 'nowrap',
+                          opacity: app.candidateId?._id ? 1 : 0.6,
                         }}
                       >
                         <i className="fas fa-envelope" style={{ marginRight: '0.5rem' }}></i>

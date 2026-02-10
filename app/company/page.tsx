@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '../components/Header';
 import { useToast } from '../contexts/ToastContext';
+import { useSocket } from '../contexts/SocketContext';
 
 export default function CompanyDashboard() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'jobs' | 'messages' | 'publish'>('jobs');
@@ -39,6 +41,57 @@ export default function CompanyDashboard() {
       }
     }
   }, [user, activeTab]);
+
+  // Listen for real-time message updates
+  useEffect(() => {
+    if (!socket || !user || !isConnected || activeTab !== 'messages') return;
+
+    const handleNewMessage = (data: { message: any }) => {
+      const message = data.message;
+      const otherUserId = 
+        message.senderId._id.toString() === user._id 
+          ? message.receiverId._id.toString() 
+          : message.senderId._id.toString();
+      
+      const otherUser = 
+        message.senderId._id.toString() === user._id 
+          ? message.receiverId 
+          : message.senderId;
+
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex((c) => c.userId === otherUserId);
+        
+        if (existingIndex >= 0) {
+          // Update existing conversation
+          const updated = [...prev];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            lastMessage: message,
+            unreadCount: message.receiverId._id.toString() === user._id 
+              ? updated[existingIndex].unreadCount + 1 
+              : updated[existingIndex].unreadCount,
+          };
+          // Move to top
+          const [moved] = updated.splice(existingIndex, 1);
+          return [moved, ...updated];
+        } else {
+          // Add new conversation
+          return [{
+            userId: otherUserId,
+            user: otherUser,
+            lastMessage: message,
+            unreadCount: message.receiverId._id.toString() === user._id ? 1 : 0,
+          }, ...prev];
+        }
+      });
+    };
+
+    socket.on('new_message', handleNewMessage);
+
+    return () => {
+      socket.off('new_message', handleNewMessage);
+    };
+  }, [socket, user, isConnected, activeTab]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
@@ -394,16 +447,46 @@ export default function CompanyDashboard() {
         )}
 
         {showJobForm && (
-          <div className="modal-overlay active" onClick={() => setShowJobForm(false)}>
-            <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', margin: '2rem auto', padding: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2>Pubblica Nuovo Annuncio</h2>
-                <button onClick={() => setShowJobForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>
+          <div className="modal-overlay active" onClick={() => setShowJobForm(false)} style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: 'rgba(0,0,0,0.5)', 
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '5rem',
+            paddingLeft: '1rem',
+            paddingRight: '1rem',
+            paddingBottom: '1rem',
+            overflow: 'auto'
+          }}>
+            <div className="card" onClick={(e) => e.stopPropagation()} style={{ 
+              maxWidth: '700px', 
+              width: '100%',
+              maxHeight: 'calc(100vh - 6rem)',
+              margin: '0 auto',
+              padding: '2rem',
+              overflow: 'auto',
+              position: 'relative',
+              marginTop: '1rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 10, paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)' }}>
+                <h2 style={{ margin: 0 }}>Pubblica Nuovo Annuncio</h2>
+                <button onClick={() => setShowJobForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
                   <i className="fas fa-times"></i>
                 </button>
               </div>
 
-              <form onSubmit={handlePublishJob}>
+              <form onSubmit={handlePublishJob} style={{ 
+                maxHeight: 'calc(90vh - 120px)', 
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                paddingRight: '0.5rem'
+              }}>
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Titolo Annuncio *</label>
                   <input
@@ -411,7 +494,8 @@ export default function CompanyDashboard() {
                     value={jobForm.title}
                     onChange={(e) => setJobForm({ ...jobForm, title: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                    placeholder="Es. Sviluppatore Full Stack"
+                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontSize: '1rem' }}
                   />
                 </div>
 
@@ -421,8 +505,9 @@ export default function CompanyDashboard() {
                     value={jobForm.description}
                     onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
                     required
-                    rows={6}
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                    rows={5}
+                    placeholder="Descrivi la posizione, responsabilità e benefici..."
+                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontSize: '1rem', resize: 'vertical', fontFamily: 'inherit' }}
                   />
                 </div>
 
@@ -512,9 +597,28 @@ export default function CompanyDashboard() {
                   </div>
                 </div>
 
-                <button type="submit" className="btn-submit" disabled={loading} style={{ width: '100%' }}>
-                  {loading ? 'Pubblicazione...' : 'Pubblica Annuncio'}
-                </button>
+                <div style={{ 
+                  position: 'sticky', 
+                  bottom: 0, 
+                  background: 'var(--bg-card)', 
+                  paddingTop: '1rem', 
+                  marginTop: '1rem',
+                  borderTop: '1px solid var(--border-light)'
+                }}>
+                  <button type="submit" className="btn-submit" disabled={loading} style={{ width: '100%', padding: '0.875rem' }}>
+                    {loading ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
+                        Pubblicazione...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-paper-plane" style={{ marginRight: '0.5rem' }}></i>
+                        Pubblica Annuncio
+                      </>
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
           </div>

@@ -50,8 +50,23 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
     setMessage('');
 
     const formData = new FormData(e.target as HTMLFormElement);
-    const email = formData.get('email') as string;
+    const email = (formData.get('email') as string)?.trim();
     const password = formData.get('password') as string;
+
+    // Validate inputs
+    if (!email || email.length === 0) {
+      setError('Email is required');
+      showToast('Email is required', 'error');
+      setLoading(false);
+      return;
+    }
+
+    if (!password || password.length === 0) {
+      setError('Password is required');
+      showToast('Password is required', 'error');
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -72,6 +87,12 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       // Direct login without OTP
       if (data.token && data.user) {
         localStorage.setItem('token', data.token);
+        // Store user ID for notifications
+        if (data.user.id) {
+          localStorage.setItem('userId', data.user.id.toString());
+        } else if (data.user._id) {
+          localStorage.setItem('userId', data.user._id.toString());
+        }
         showToast('Login successful!', 'success');
         if (onSuccess) {
           onSuccess(data.token, data.user);
@@ -118,14 +139,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       registerData.companyWebsite = formData.get('companyWebsite') as string;
     }
 
-    // Add candidate-specific fields
-    if (userType === 'candidate') {
-      registerData.education = formData.get('education') as string;
-      const skillsStr = formData.get('skills') as string;
-      if (skillsStr) {
-        registerData.skills = skillsStr.split(',').map(s => s.trim()).filter(s => s);
-      }
-    }
+    // Candidate-specific fields removed - users can add these from profile
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -159,6 +173,12 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       // Direct registration without OTP
       if (data.token && data.user) {
         localStorage.setItem('token', data.token);
+        // Store user ID for notifications
+        if (data.user.id) {
+          localStorage.setItem('userId', data.user.id.toString());
+        } else if (data.user._id) {
+          localStorage.setItem('userId', data.user._id.toString());
+        }
         showToast('Registrazione completata con successo!', 'success');
         if (onSuccess) {
           onSuccess(data.token, data.user);
@@ -579,39 +599,6 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
                     </>
                   )}
 
-                  {userType === 'candidate' && (
-                    <>
-                      <div className="auth-form-group">
-                        <label>Titolo di Studio</label>
-                        <select 
-                          name="education" 
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: '1px solid var(--border-light)',
-                            borderRadius: 'var(--radius-md)',
-                            fontSize: '1rem',
-                            fontFamily: 'inherit'
-                          }}
-                        >
-                          <option value="">Seleziona...</option>
-                          <option value="Laurea Magistrale">Laurea Magistrale</option>
-                          <option value="Laurea Triennale">Laurea Triennale</option>
-                          <option value="Laurea">Laurea</option>
-                          <option value="Diploma">Diploma</option>
-                          <option value="Other">Altro</option>
-                        </select>
-                      </div>
-                      <div className="auth-form-group">
-                        <label>Competenze (separate da virgola)</label>
-                        <input 
-                          type="text" 
-                          name="skills" 
-                          placeholder="Es. JavaScript, React, Node.js" 
-                        />
-                      </div>
-                    </>
-                  )}
 
                   <div className="auth-form-group">
                     <label>Email</label>

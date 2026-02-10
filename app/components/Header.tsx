@@ -24,11 +24,8 @@ export default function Header() {
   useEffect(() => {
     // Close mobile menu when route changes
     setMobileMenuOpen(false);
-    // Refresh user data when route changes (in case role changed)
-    const token = localStorage.getItem('token');
-    if (token && isAuthenticated) {
-      fetchUserData(token);
-    }
+    // Only refresh user data if we don't have user data yet
+    // Don't refresh on every route change to avoid excessive API calls
   }, [pathname]);
 
   const fetchUserData = async (token: string) => {
@@ -57,6 +54,12 @@ export default function Header() {
 
   const handleAuthSuccess = (token: string, userData: any) => {
     localStorage.setItem('token', token);
+    // Store user ID for notifications
+    if (userData?.id) {
+      localStorage.setItem('userId', userData.id.toString());
+    } else if (userData?._id) {
+      localStorage.setItem('userId', userData._id.toString());
+    }
     setIsAuthenticated(true);
     setUser(userData);
     setAuthModalOpen(false);
@@ -75,6 +78,7 @@ export default function Header() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('userId');
     setIsAuthenticated(false);
     setUser(null);
     router.push('/');
@@ -104,101 +108,23 @@ export default function Header() {
               <Link href="/profile" className={isActive('/profile') ? 'active' : ''}>
                 Profilo
               </Link>
-              {user?.userType === 'company' && (
-                <>
-                  <Link 
-                    href="/company" 
-                    className={isActive('/company') ? 'active' : ''}
-                    style={{ 
-                      background: 'var(--primary)', 
-                      color: 'white', 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: 'var(--radius-lg)',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                  >
-                    <i className="fas fa-building"></i>
-                    Dashboard Azienda
-                  </Link>
-                  <Link 
-                    href="/messages" 
-                    className={isActive('/messages') ? 'active' : ''}
-                    style={{ 
-                      color: 'var(--text-primary)', 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: 'var(--radius-lg)',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      position: 'relative'
-                    }}
-                  >
-                    <i className="fas fa-envelope"></i>
-                    Messaggi
-                  </Link>
-                </>
-              )}
-              {user?.userType === 'candidate' && (
-                <>
-                  <Link 
-                    href="/candidate" 
-                    className={isActive('/candidate') ? 'active' : ''}
-                    style={{ 
-                      background: 'var(--primary)', 
-                      color: 'white', 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: 'var(--radius-lg)',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                  >
-                    <i className="fas fa-user"></i>
-                    Dashboard Candidato
-                  </Link>
-                  <Link 
-                    href="/messages" 
-                    className={isActive('/messages') ? 'active' : ''}
-                    style={{ 
-                      color: 'var(--text-primary)', 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: 'var(--radius-lg)',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      position: 'relative'
-                    }}
-                  >
-                    <i className="fas fa-envelope"></i>
-                    Messaggi
-                  </Link>
-                </>
-              )}
-              {user?.role === 'admin' && (
-                <Link 
-                  href="/admin" 
-                  className={isActive('/admin') ? 'active' : ''}
-                  style={{ 
-                    background: 'var(--primary)', 
-                    color: 'white', 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: 'var(--radius-lg)',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <i className="fas fa-cog"></i>
-                  Admin Dashboard
-                </Link>
-              )}
+              <Link 
+                href="/messages" 
+                className={isActive('/messages') ? 'active' : ''}
+                style={{ 
+                  color: 'var(--text-primary)', 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: 'var(--radius-lg)',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  position: 'relative'
+                }}
+              >
+                <i className="fas fa-envelope"></i>
+                Messaggi
+              </Link>
               {user?.role === 'admin' && (
                 <span style={{
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -268,100 +194,21 @@ export default function Header() {
                 <Link href="/profile" className={isActive('/profile') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
                   <i className="fas fa-user"></i> Profilo
                 </Link>
-                {user?.userType === 'company' && (
-                  <>
-                    <Link 
-                      href="/company" 
-                      className={isActive('/company') ? 'active' : ''} 
-                      onClick={() => setMobileMenuOpen(false)}
-                      style={{
-                        background: 'var(--primary)',
-                        color: 'white',
-                        fontWeight: '700',
-                        padding: '0.75rem 1rem',
-                        borderRadius: 'var(--radius-lg)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        margin: '0.5rem 0'
-                      }}
-                    >
-                      <i className="fas fa-building"></i> Dashboard Azienda
-                    </Link>
-                    <Link 
-                      href="/messages" 
-                      className={isActive('/messages') ? 'active' : ''} 
-                      onClick={() => setMobileMenuOpen(false)}
-                      style={{
-                        color: 'var(--text-primary)',
-                        fontWeight: '600',
-                        padding: '0.75rem 1rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                      }}
-                    >
-                      <i className="fas fa-envelope"></i> Messaggi
-                    </Link>
-                  </>
-                )}
-                {user?.userType === 'candidate' && (
-                  <>
-                    <Link 
-                      href="/candidate" 
-                      className={isActive('/candidate') ? 'active' : ''} 
-                      onClick={() => setMobileMenuOpen(false)}
-                      style={{
-                        background: 'var(--primary)',
-                        color: 'white',
-                        fontWeight: '700',
-                        padding: '0.75rem 1rem',
-                        borderRadius: 'var(--radius-lg)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        margin: '0.5rem 0'
-                      }}
-                    >
-                      <i className="fas fa-user"></i> Dashboard Candidato
-                    </Link>
-                    <Link 
-                      href="/messages" 
-                      className={isActive('/messages') ? 'active' : ''} 
-                      onClick={() => setMobileMenuOpen(false)}
-                      style={{
-                        color: 'var(--text-primary)',
-                        fontWeight: '600',
-                        padding: '0.75rem 1rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                      }}
-                    >
-                      <i className="fas fa-envelope"></i> Messaggi
-                    </Link>
-                  </>
-                )}
-                {user?.role === 'admin' && (
-                  <Link 
-                    href="/admin" 
-                    className={isActive('/admin') ? 'active' : ''} 
-                    onClick={() => setMobileMenuOpen(false)}
-                    style={{
-                      background: 'linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)',
-                      color: 'white',
-                      fontWeight: '700',
-                      padding: '0.75rem 1rem',
-                      borderRadius: 'var(--radius-lg)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      margin: '0.5rem 0'
-                    }}
-                  >
-                    <i className="fas fa-cog"></i> Admin Dashboard
-                  </Link>
-                )}
+                <Link 
+                  href="/messages" 
+                  className={isActive('/messages') ? 'active' : ''} 
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontWeight: '600',
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <i className="fas fa-envelope"></i> Messaggi
+                </Link>
                 <button onClick={handleLogout} className="mobile-nav-button">
                   <i className="fas fa-sign-out-alt"></i> Logout
                 </button>

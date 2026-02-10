@@ -252,52 +252,205 @@ export default function JobDetailPage() {
         </div>
 
         {showApplicationForm && (
-          <div className="modal-overlay active" onClick={() => setShowApplicationForm(false)}>
-            <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', margin: '2rem auto', padding: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2>Candidati per {job.title}</h2>
-                <button onClick={() => setShowApplicationForm(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>
+          <div className="modal-overlay active" onClick={() => setShowApplicationForm(false)} style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: 'rgba(0,0,0,0.5)', 
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '5rem',
+            paddingLeft: '1rem',
+            paddingRight: '1rem',
+            paddingBottom: '1rem',
+            overflow: 'auto'
+          }}>
+            <div className="card" onClick={(e) => e.stopPropagation()} style={{ 
+              maxWidth: '800px', 
+              width: '100%',
+              maxHeight: 'calc(100vh - 6rem)',
+              margin: '0 auto',
+              padding: '2.5rem',
+              overflow: 'auto',
+              position: 'relative',
+              marginTop: '1rem',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '2rem',
+                position: 'sticky',
+                top: 0,
+                background: 'var(--bg-card)',
+                zIndex: 10,
+                paddingBottom: '1rem',
+                borderBottom: '2px solid var(--border-light)'
+              }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.75rem', color: 'var(--primary)' }}>Candidati per questa posizione</h2>
+                  <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                    {job.title} - {job.companyId?.companyName || job.companyId?.name}
+                  </p>
+                </div>
+                <button onClick={() => setShowApplicationForm(false)} style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  fontSize: '1.5rem', 
+                  cursor: 'pointer',
+                  color: 'var(--text-primary)',
+                  padding: '0.5rem',
+                  borderRadius: 'var(--radius-md)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'none';
+                }}>
                   <i className="fas fa-times"></i>
                 </button>
               </div>
 
-              <form onSubmit={(e) => { e.preventDefault(); handleApply(); }}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Lettera di Presentazione</label>
+              <form onSubmit={(e) => { e.preventDefault(); handleApply(); }} style={{ 
+                maxHeight: 'calc(100vh - 200px)', 
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                paddingRight: '0.5rem'
+              }}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: '600', fontSize: '1rem' }}>
+                    <i className="fas fa-file-alt" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
+                    Lettera di Presentazione *
+                  </label>
                   <textarea
                     value={applicationForm.coverLetter}
                     onChange={(e) => setApplicationForm({ ...applicationForm, coverLetter: e.target.value })}
-                    rows={6}
-                    placeholder="Scrivi una breve lettera di presentazione..."
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                    rows={8}
+                    placeholder="Scrivi una lettera di presentazione che evidenzi le tue competenze, esperienza e motivazione per questa posizione..."
+                    required
+                    style={{ 
+                      width: '100%', 
+                      padding: '1rem', 
+                      border: '2px solid var(--border-light)', 
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '1rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--primary)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border-light)';
+                    }}
                   />
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                    Descrivi perché sei il candidato ideale per questa posizione
+                  </p>
                 </div>
 
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>URL CV (opzionale)</label>
-                  <input
-                    type="url"
-                    value={applicationForm.cvUrl}
-                    onChange={(e) => setApplicationForm({ ...applicationForm, cvUrl: e.target.value })}
-                    placeholder="https://..."
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: '600', fontSize: '1rem' }}>
+                      <i className="fas fa-file-pdf" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
+                      URL CV (opzionale)
+                    </label>
+                    <input
+                      type="url"
+                      value={applicationForm.cvUrl}
+                      onChange={(e) => setApplicationForm({ ...applicationForm, cvUrl: e.target.value })}
+                      placeholder="https://example.com/cv.pdf"
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.875rem', 
+                        border: '2px solid var(--border-light)', 
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '1rem',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--primary)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--border-light)';
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: '600', fontSize: '1rem' }}>
+                      <i className="fas fa-video" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
+                      URL Video CV (opzionale)
+                    </label>
+                    <input
+                      type="url"
+                      value={applicationForm.videoCvUrl}
+                      onChange={(e) => setApplicationForm({ ...applicationForm, videoCvUrl: e.target.value })}
+                      placeholder="https://youtube.com/..."
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.875rem', 
+                        border: '2px solid var(--border-light)', 
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '1rem',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--primary)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--border-light)';
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>URL Video CV (opzionale)</label>
-                  <input
-                    type="url"
-                    value={applicationForm.videoCvUrl}
-                    onChange={(e) => setApplicationForm({ ...applicationForm, videoCvUrl: e.target.value })}
-                    placeholder="https://..."
-                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
-                  />
+                <div style={{ 
+                  position: 'sticky', 
+                  bottom: 0, 
+                  background: 'var(--bg-card)', 
+                  paddingTop: '1.5rem', 
+                  marginTop: '1rem',
+                  borderTop: '2px solid var(--border-light)'
+                }}>
+                  <button type="submit" className="btn-submit" disabled={applying} style={{ 
+                    width: '100%', 
+                    padding: '1rem',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    {applying ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        Invio in corso...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-paper-plane"></i>
+                        Invia Candidatura
+                      </>
+                    )}
+                  </button>
+                  <p style={{ 
+                    fontSize: '0.875rem', 
+                    color: 'var(--text-secondary)', 
+                    textAlign: 'center', 
+                    marginTop: '0.75rem' 
+                  }}>
+                    La tua candidatura verrà inviata all'azienda per la revisione
+                  </p>
                 </div>
-
-                <button type="submit" className="btn-submit" disabled={applying} style={{ width: '100%' }}>
-                  {applying ? 'Invio in corso...' : 'Invia Candidatura'}
-                </button>
               </form>
             </div>
           </div>

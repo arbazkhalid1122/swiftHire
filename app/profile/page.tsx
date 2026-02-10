@@ -22,11 +22,15 @@ export default function ProfilePage() {
     videoCvUrl: '',
     education: '',
     skills: '',
+    yearsOfExperience: '',
     companyName: '',
     companyDescription: '',
     companyWebsite: '',
   });
   const [userType, setUserType] = useState<'company' | 'candidate' | null>(null);
+  const [uploadingCV, setUploadingCV] = useState(false);
+  const [cvUploadProgress, setCvUploadProgress] = useState('');
+  const [extractedData, setExtractedData] = useState<any>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -70,6 +74,7 @@ export default function ProfilePage() {
         videoCvUrl: data.user.videoCvUrl || '',
         education: data.user.education || '',
         skills: data.user.skills?.join(', ') || '',
+        yearsOfExperience: data.user.calculatedExperience?.toString() || '',
         companyName: data.user.companyName || '',
         companyDescription: data.user.companyDescription || '',
         companyWebsite: data.user.companyWebsite || '',
@@ -129,6 +134,90 @@ export default function ProfilePage() {
       ...profileData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      showToast('Solo file PDF sono supportati', 'error');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Il file deve essere inferiore a 10MB', 'error');
+      return;
+    }
+
+    setUploadingCV(true);
+    setCvUploadProgress('Caricamento CV...');
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload/cv', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.error || 'Errore nel caricamento del CV', 'error');
+        setUploadingCV(false);
+        return;
+      }
+
+      setCvUploadProgress('Estrazione dati dal CV...');
+      
+      // Update profile data with new CV URL
+      setProfileData(prev => ({
+        ...prev,
+        cvUrl: data.cvUrl,
+      }));
+
+      // Update other fields if extracted
+      if (data.updatedFields) {
+        if (data.updatedFields.phone === 'Updated') {
+          fetchProfile(); // Refresh to get updated phone
+        }
+        if (data.updatedFields.location === 'Updated') {
+          fetchProfile(); // Refresh to get updated location
+        }
+        if (data.updatedFields.skills !== 'No skills found') {
+          fetchProfile(); // Refresh to get updated skills
+        }
+        if (data.updatedFields.education !== 'Not found') {
+          fetchProfile(); // Refresh to get updated education
+        }
+      }
+
+      setExtractedData(data.extractedData);
+      showToast('CV caricato e processato con successo!', 'success');
+      
+      // Refresh profile after a short delay to show updated data
+      setTimeout(() => {
+        fetchProfile();
+      }, 1000);
+    } catch (error) {
+      showToast('Errore di rete durante il caricamento', 'error');
+    } finally {
+      setUploadingCV(false);
+      setCvUploadProgress('');
+      // Reset file input
+      e.target.value = '';
+    }
   };
 
   if (loading) {
@@ -243,6 +332,22 @@ export default function ProfilePage() {
                     </select>
                   </div>
                   <div>
+                    <label>Anni di Esperienza</label>
+                    <input
+                      type="number"
+                      name="yearsOfExperience"
+                      value={profileData.yearsOfExperience}
+                      onChange={handleChange}
+                      disabled={!isEditMode}
+                      placeholder="0"
+                      min="0"
+                      step="0.5"
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div>
                     <label>Competenze (separate da virgola)</label>
                     <input
                       type="text"
@@ -257,15 +362,89 @@ export default function ProfilePage() {
 
                 <div className="form-row">
                   <div>
-                    <label>URL CV (PDF o Link)</label>
-                    <input
-                      type="url"
-                      name="cvUrl"
-                      value={profileData.cvUrl}
-                      onChange={handleChange}
-                      disabled={!isEditMode}
-                      placeholder="https://..."
-                    />
+                    <label>CV (Carica PDF o Inserisci URL)</label>
+                    {isEditMode ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <label
+                            htmlFor="cv-upload"
+                            style={{
+                              padding: '0.75rem 1rem',
+                              background: 'var(--primary)',
+                              color: 'white',
+                              borderRadius: 'var(--radius-md)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            <i className="fas fa-upload"></i>
+                            {uploadingCV ? 'Caricamento...' : 'Carica PDF'}
+                          </label>
+                          <input
+                            id="cv-upload"
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            onChange={handleCVUpload}
+                            disabled={uploadingCV}
+                            style={{ display: 'none' }}
+                          />
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>oppure</span>
+                        </div>
+                        <input
+                          type="url"
+                          name="cvUrl"
+                          value={profileData.cvUrl}
+                          onChange={handleChange}
+                          placeholder="https://... (URL alternativo)"
+                          style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                        />
+                        {cvUploadProgress && (
+                          <div style={{ 
+                            padding: '0.5rem', 
+                            background: 'var(--bg-secondary)', 
+                            borderRadius: 'var(--radius-md)',
+                            fontSize: '0.875rem',
+                            color: 'var(--text-secondary)'
+                          }}>
+                            {cvUploadProgress}
+                          </div>
+                        )}
+                        {extractedData && (
+                          <div style={{ 
+                            padding: '0.75rem', 
+                            background: 'rgba(16, 185, 129, 0.1)', 
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            fontSize: '0.875rem'
+                          }}>
+                            <strong style={{ color: 'var(--success)' }}>Dati estratti:</strong>
+                            <ul style={{ margin: '0.5rem 0 0 1.5rem', padding: 0 }}>
+                              {extractedData.skills?.length > 0 && (
+                                <li>Competenze: {extractedData.skills.length} trovate</li>
+                              )}
+                              {extractedData.education?.length > 0 && (
+                                <li>Formazione: {extractedData.education.join(', ')}</li>
+                              )}
+                              {extractedData.experience > 0 && (
+                                <li>Esperienze: {extractedData.experience} trovate</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <input
+                        type="url"
+                        name="cvUrl"
+                        value={profileData.cvUrl}
+                        onChange={handleChange}
+                        disabled={true}
+                        placeholder="Nessun CV caricato"
+                      />
+                    )}
                     {profileData.cvUrl && (
                       <a
                         href={profileData.cvUrl}

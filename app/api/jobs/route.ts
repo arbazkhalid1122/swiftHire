@@ -131,22 +131,28 @@ export async function POST(request: NextRequest) {
 
 // Smart ranking function
 async function rankJobsForCandidate(jobs: any[], candidate: any): Promise<any[]> {
-  const candidateSkills = candidate.skills || [];
+  // Get skills from both profile and extracted CV data
+  const profileSkills = candidate.skills || [];
+  const cvSkills = candidate.cvExtractedData?.skills || [];
+  const candidateSkills = [...new Set([...profileSkills, ...cvSkills])]; // Merge and deduplicate
+  
   const candidateExperience = candidate.calculatedExperience || 0;
-  const candidateEducation = candidate.education || '';
+  const candidateEducation = candidate.education || candidate.cvExtractedData?.education?.[0] || '';
 
   const scoredJobs = jobs.map((job: any) => {
     let score = 0;
+    const matchReasons: string[] = [];
 
     // Experience match
     const requiredExp = job.requirements?.minExperience || 0;
     if (candidateExperience >= requiredExp) {
       score += 30;
+      matchReasons.push(`Esperienza: ${candidateExperience} anni (richiesti: ${requiredExp})`);
     } else {
       score -= (requiredExp - candidateExperience) * 10;
     }
 
-    // Education match
+    // Education match - check both profile and CV extracted data
     if (job.requirements?.education) {
       const educationLevels: Record<string, number> = {
         'Laurea Magistrale': 4,
@@ -154,27 +160,86 @@ async function rankJobsForCandidate(jobs: any[], candidate: any): Promise<any[]>
         'Laurea': 3,
         'Diploma': 2,
         'Other': 1,
+        'master': 4,
+        'phd': 5,
+        'doctorate': 5,
+        'bachelor': 3,
+        'degree': 3,
       };
-      const candidateLevel = educationLevels[candidateEducation] || 1;
+      
+      // Check profile education
+      let candidateLevel = educationLevels[candidateEducation] || 1;
+      
+      // Also check CV extracted education (use highest)
+      if (candidate.cvExtractedData?.education) {
+        candidate.cvExtractedData.education.forEach((edu: string) => {
+          const eduLower = edu.toLowerCase();
+          let level = educationLevels[eduLower] || 1;
+          
+          // Try to find partial match
+          if (level === 1) {
+            const matchedKey = Object.keys(educationLevels).find(k => eduLower.includes(k));
+            if (matchedKey) {
+              level = educationLevels[matchedKey];
+            }
+          }
+          
+          if (level > candidateLevel) {
+            candidateLevel = level;
+          }
+        });
+      }
+      
       const requiredLevel = educationLevels[job.requirements.education] || 1;
       if (candidateLevel >= requiredLevel) {
         score += 20;
+        matchReasons.push(`Formazione: ${candidateEducation || candidate.cvExtractedData?.education?.[0] || 'Trovata nel CV'}`);
       }
     }
 
-    // Skills match
+    // Skills match - enhanced with CV extracted skills
     const jobSkills = job.requirements?.skills || [];
     if (jobSkills.length > 0 && candidateSkills.length > 0) {
       const matchingSkills = jobSkills.filter((skill: string) =>
-        candidateSkills.some((cs: string) =>
-          cs.toLowerCase().includes(skill.toLowerCase()) ||
-          skill.toLowerCase().includes(cs.toLowerCase())
-        )
+        candidateSkills.some((cs: string) => {
+          const csLower = cs.toLowerCase();
+          const skillLower = skill.toLowerCase();
+          return csLower.includes(skillLower) || skillLower.includes(csLower);
+        })
       );
-      score += (matchingSkills.length / jobSkills.length) * 50;
+      
+      const skillMatchRatio = matchingSkills.length / jobSkills.length;
+      score += skillMatchRatio * 50;
+      
+      if (matchingSkills.length > 0) {
+        matchReasons.push(`Competenze corrispondenti: ${matchingSkills.slice(0, 3).join(', ')}${matchingSkills.length > 3 ? '...' : ''}`);
+      }
     }
 
-    return { ...job, matchScore: score };
+    // Bonus for CV extracted data (shows more complete profile)
+    if (candidate.cvExtractedData) {
+      score += 5; // Small bonus for having extracted CV data
+    }
+
+    // Bonus for languages if job mentions international work
+    if (candidate.cvExtractedData?.languages && candidate.cvExtractedData.languages.length > 1) {
+      if (job.description?.toLowerCase().includes('international') || 
+          job.description?.toLowerCase().includes('multilingual')) {
+        score += 10;
+        matchReasons.push('Competenze linguistiche');
+      }
+    }
+
+    // Bonus for certifications
+    if (candidate.cvExtractedData?.certifications && candidate.cvExtractedData.certifications.length > 0) {
+      score += 5;
+    }
+
+    return { 
+      ...job, 
+      matchScore: Math.max(0, score), // Ensure score is not negative
+      matchReasons: matchReasons.slice(0, 3), // Limit to top 3 reasons
+    };
   });
 
   // Sort by score (highest first)

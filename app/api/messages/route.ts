@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import Message from '@/models/Message';
 import User from '@/models/User';
 import { verifyAuth } from '@/middleware/auth';
+import { getIO } from '@/lib/socket';
 
 // GET - Get messages for the authenticated user
 export async function GET(request: NextRequest) {
@@ -139,6 +140,17 @@ export async function POST(request: NextRequest) {
       .populate('receiverId', 'name email userType companyName')
       .populate('jobId', 'title')
       .lean();
+
+    // Emit socket event if Socket.IO is available
+    const io = getIO();
+    if (io) {
+      // Emit to receiver if online
+      io.to(`user:${receiverId}`).emit('new_message', { message: populatedMessage });
+      
+      // Also emit to conversation room
+      const conversationId = [auth.userId, receiverId].sort().join(':');
+      io.to(`conversation:${conversationId}`).emit('new_message', { message: populatedMessage });
+    }
 
     return NextResponse.json(
       { message: populatedMessage },

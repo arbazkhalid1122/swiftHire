@@ -39,6 +39,11 @@ export async function GET(request: NextRequest) {
           videoCvUrl: user.videoCvUrl,
           education: user.education,
           skills: user.skills,
+          languages: user.languages,
+          certifications: user.certifications,
+          educationHistory: user.educationHistory,
+          cvExtractedData: user.cvExtractedData,
+          calculatedExperience: user.calculatedExperience,
           companyName: user.companyName,
           companyDescription: user.companyDescription,
           companyWebsite: user.companyWebsite,
@@ -68,7 +73,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { name, phone, location, bio, cvUrl, videoCvUrl, education, skills, companyName, companyDescription, companyWebsite } = await request.json();
+    const { name, phone, location, bio, cvUrl, videoCvUrl, education, skills, yearsOfExperience, languages, certifications, educationHistory, companyName, companyDescription, companyWebsite } = await request.json();
 
     const user = await User.findById(auth.userId);
     if (!user) {
@@ -92,6 +97,18 @@ export async function PUT(request: NextRequest) {
       user.skills = typeof skills === 'string' 
         ? skills.split(',').map(s => s.trim()).filter(s => s.length > 0)
         : skills;
+    }
+    if (yearsOfExperience !== undefined) {
+      user.calculatedExperience = parseFloat(yearsOfExperience) || 0;
+    }
+    if (languages !== undefined) {
+      user.languages = languages;
+    }
+    if (certifications !== undefined) {
+      user.certifications = certifications;
+    }
+    if (educationHistory !== undefined) {
+      user.educationHistory = educationHistory;
     }
     
     // Company-specific fields

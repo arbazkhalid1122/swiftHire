@@ -5,38 +5,43 @@ import { useRouter } from 'next/navigation';
 import Header from './components/Header';
 import AuthModal from './components/AuthModal';
 import { useToast } from './contexts/ToastContext';
+import { useSocket } from './contexts/SocketContext';
+import CompanyDashboard from './company/page';
+import CandidateDashboard from './candidate/page';
 
 export default function Home() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { socket, isConnected } = useSocket();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [jobs, setJobs] = useState<any[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   const handleAuthSuccess = (token: string, userData: any) => {
     localStorage.setItem('token', token);
+    // Store user ID for notifications
+    if (userData?.id) {
+      localStorage.setItem('userId', userData.id.toString());
+    } else if (userData?._id) {
+      localStorage.setItem('userId', userData._id.toString());
+    }
     setUser(userData);
     setAuthModalOpen(false);
-    
-    // Redirect based on user type
-    if (userData?.role === 'admin') {
-      router.push('/admin');
-    } else if (userData?.userType === 'company') {
-      router.push('/company');
-    } else if (userData?.userType === 'candidate') {
-      router.push('/candidate');
-    }
+    // No redirect - dashboard will show on home page
   };
 
   useEffect(() => {
     checkAuth();
-    fetchJobs();
-  }, []);
+    if (!user) {
+      fetchJobs();
+    }
+  }, [user]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
@@ -48,11 +53,17 @@ export default function Home() {
         if (response.ok) {
           const data = await response.json();
           setUser(data.user);
+        } else {
+          setUser(null);
         }
       } catch (error) {
         console.error('Error fetching user:', error);
+        setUser(null);
       }
+    } else {
+      setUser(null);
     }
+    setLoading(false);
   };
 
   const fetchJobs = async () => {
@@ -99,6 +110,31 @@ export default function Home() {
     }
   };
 
+  // Show dashboard if user is logged in
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <div className="main-container" style={{ padding: '3rem', textAlign: 'center' }}>
+          <div className="loading-spinner"></div>
+        </div>
+      </>
+    );
+  }
+
+  // Show dashboard content for logged-in users (dashboard components already include Header)
+  if (user) {
+    if (user.userType === 'company') {
+      return <CompanyDashboard />;
+    } else if (user.userType === 'candidate') {
+      return <CandidateDashboard />;
+    } else if (user.role === 'admin') {
+      router.push('/admin');
+      return null;
+    }
+  }
+
+  // Show landing page for non-logged-in users
   return (
     <>
       <Header />
@@ -155,67 +191,7 @@ export default function Home() {
                 Accedi
               </button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {user.userType === 'company' && (
-                <button
-                  onClick={() => router.push('/company')}
-                  className="btn-submit"
-                  style={{
-                    padding: '1rem 2.5rem',
-                    fontSize: '1.1rem',
-                    fontWeight: '700',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    background: 'white',
-                    color: 'var(--primary)',
-                  }}
-                >
-                  <i className="fas fa-building"></i>
-                  Vai alla Dashboard Azienda
-                </button>
-              )}
-              {user.userType === 'candidate' && (
-                <button
-                  onClick={() => router.push('/candidate')}
-                  className="btn-submit"
-                  style={{
-                    padding: '1rem 2.5rem',
-                    fontSize: '1.1rem',
-                    fontWeight: '700',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    background: 'white',
-                    color: 'var(--primary)',
-                  }}
-                >
-                  <i className="fas fa-user"></i>
-                  Vai alla Dashboard Candidato
-                </button>
-              )}
-              {user.role === 'admin' && (
-                <button
-                  onClick={() => router.push('/admin')}
-                  className="btn-submit"
-                  style={{
-                    padding: '1rem 2.5rem',
-                    fontSize: '1.1rem',
-                    fontWeight: '700',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    background: 'white',
-                    color: 'var(--primary)',
-                  }}
-                >
-                  <i className="fas fa-cog"></i>
-                  Vai alla Dashboard Admin
-                </button>
-              )}
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* FEATURES SECTION */}
