@@ -642,12 +642,13 @@ export default function MessagesPage() {
               disabled={sending}
               style={{
                 flex: 1,
-                padding: '0.75rem 1rem',
+                padding: '0.875rem 1rem',
                 border: '1px solid var(--border-light)',
                 borderRadius: 'var(--radius-md)',
                 fontSize: '1rem',
                 opacity: sending ? 0.6 : 1,
                 cursor: sending ? 'not-allowed' : 'text',
+                boxSizing: 'border-box',
               }}
             />
             {isTyping && (
@@ -670,9 +671,12 @@ export default function MessagesPage() {
               className="btn-submit"
               disabled={sending || !newMessage.trim()}
               style={{ 
-                padding: '0.75rem 2rem',
+                padding: '1rem 2rem',
                 opacity: (sending || !newMessage.trim()) ? 0.6 : 1,
                 cursor: (sending || !newMessage.trim()) ? 'not-allowed' : 'pointer',
+                minWidth: 'fit-content',
+                whiteSpace: 'nowrap',
+                boxSizing: 'border-box',
               }}
               title={!newMessage.trim() ? 'Inserisci un messaggio' : sending ? 'Invio in corso...' : 'Invia messaggio'}
             >

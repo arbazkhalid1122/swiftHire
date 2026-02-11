@@ -75,12 +75,14 @@ export default function AdminDashboard() {
 
       const data = await response.json();
       if (data.user.role !== 'admin') {
-        setError('Access denied. Admin privileges required.');
-        setLoading(false);
+        // Immediately redirect non-admin users
+        showToast('Access denied. Admin privileges required.', 'error');
+        router.push('/');
         return;
       }
 
       setIsAdmin(true);
+      setLoading(false);
     } catch (err) {
       setError('Network error. Please try again.');
       setLoading(false);

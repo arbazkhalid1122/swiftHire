@@ -8,6 +8,7 @@ import { useToast } from './contexts/ToastContext';
 import { useSocket } from './contexts/SocketContext';
 import CompanyDashboard from './company/page';
 import CandidateDashboard from './candidate/page';
+import AdminDashboard from './admin/page';
 
 export default function Home() {
   const router = useRouter();
@@ -38,12 +39,17 @@ export default function Home() {
 
   useEffect(() => {
     checkAuth();
-    if (!user) {
+  }, []); // Only run once on mount
+
+  useEffect(() => {
+    // Only fetch jobs if user is not logged in
+    if (!user && !loading) {
       fetchJobs();
     }
-  }, [user]);
+  }, [user, loading]);
 
   const checkAuth = async () => {
+    setLoading(true);
     const token = localStorage.getItem('token');
     if (token) {
       try {
@@ -124,13 +130,14 @@ export default function Home() {
 
   // Show dashboard content for logged-in users (dashboard components already include Header)
   if (user) {
-    if (user.userType === 'company') {
+    // Check admin role first (admins might also have userType set)
+    if (user.role === 'admin') {
+      // Show admin dashboard on home page instead of redirecting
+      return <AdminDashboard />;
+    } else if (user.userType === 'company') {
       return <CompanyDashboard />;
     } else if (user.userType === 'candidate') {
       return <CandidateDashboard />;
-    } else if (user.role === 'admin') {
-      router.push('/admin');
-      return null;
     }
   }
 
@@ -163,6 +170,8 @@ export default function Home() {
                   gap: '0.75rem',
                   background: 'white',
                   color: 'var(--primary)',
+                  minWidth: 'fit-content',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <i className="fas fa-user-plus"></i>
@@ -185,6 +194,8 @@ export default function Home() {
                   border: '2px solid white',
                   borderRadius: 'var(--radius-lg)',
                   cursor: 'pointer',
+                  minWidth: 'fit-content',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <i className="fas fa-sign-in-alt"></i>
@@ -233,15 +244,15 @@ export default function Home() {
 
         {/* FEATURED JOBS SECTION */}
         <div style={{ marginBottom: '3rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '2rem', color: 'var(--primary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', gap: '1rem' }}>
+            <h2 style={{ fontSize: '2rem', color: 'var(--primary)',minWidth: 'fit-content' }}>
               Lavori in Evidenza
             </h2>
             {!user && (
               <button
                 onClick={() => router.push('/candidate')}
                 className="btn-submit"
-                style={{ padding: '0.75rem 1.5rem' }}
+                style={{ padding: '1rem 1.5rem', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
               >
                 Vedi Tutti i Lavori
               </button>
@@ -250,7 +261,7 @@ export default function Home() {
               <button
                 onClick={() => router.push('/candidate')}
                 className="btn-submit"
-                style={{ padding: '0.75rem 1.5rem' }}
+                style={{ padding: '1rem 1.5rem', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
               >
                 Vedi Tutti i Lavori
               </button>
@@ -311,7 +322,7 @@ export default function Home() {
                   </p>
                   <button
                     className="btn-submit"
-                    style={{ width: '100%', padding: '0.75rem' }}
+                    style={{ width: '100%', padding: '1rem', minWidth: 'fit-content', whiteSpace: 'nowrap' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       router.push(`/jobs/${job._id}`);

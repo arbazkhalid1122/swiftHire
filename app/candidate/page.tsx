@@ -852,26 +852,26 @@ export default function CandidateDashboard() {
 
         {activeTab === 'search' && (
           <div>
-            <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '2rem', padding: '0.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
                 <input
                   type="text"
                   placeholder="Cerca per titolo o descrizione..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                  style={{ padding: '1rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxSizing: 'border-box' }}
                 />
                 <input
                   type="text"
                   placeholder="Località..."
                   value={locationFilter}
                   onChange={(e) => setLocationFilter(e.target.value)}
-                  style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                  style={{ padding: '1rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxSizing: 'border-box' }}
                 />
                 <select
                   value={jobTypeFilter}
                   onChange={(e) => setJobTypeFilter(e.target.value)}
-                  style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                  style={{ padding: '1rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxSizing: 'border-box' }}
                 >
                   <option value="">Tutti i tipi</option>
                   <option value="full-time">Full-time</option>
@@ -882,7 +882,7 @@ export default function CandidateDashboard() {
                 <button
                   onClick={fetchJobs}
                   className="btn-submit"
-                  style={{ whiteSpace: 'nowrap' }}
+                  style={{ whiteSpace: 'nowrap', width: 'auto', minWidth: 'fit-content', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 0, padding: '1rem' }}
                 >
                   <i className="fas fa-search"></i>
                 </button>
@@ -954,12 +954,15 @@ export default function CandidateDashboard() {
                       <button
                         onClick={() => router.push(`/jobs/${job._id}`)}
                         style={{
-                          padding: '0.5rem 1rem',
+                          minWidth: 'fit-content',
+                          padding: '1rem',
                           background: 'var(--primary)',
                           color: 'white',
                           border: 'none',
                           borderRadius: 'var(--radius-md)',
                           cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          boxSizing: 'border-box',
                         }}
                       >
                         Visualizza Dettagli
@@ -967,6 +970,7 @@ export default function CandidateDashboard() {
                       <button
                         onClick={() => handleApply(job._id)}
                         className="btn-submit"
+                        style={{ marginTop: 0, width: '100%' }}
                       >
                         Candidati
                       </button>

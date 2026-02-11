@@ -291,13 +291,15 @@ header:hover {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all var(--transition-base);
-  padding: 10px 18px;
+  padding: 1rem 1.125rem;
   border-radius: var(--radius-lg);
   border: none;
   background: transparent;
   white-space: nowrap;
   position: relative;
   overflow: hidden;
+  min-width: fit-content;
+  box-sizing: border-box;
 }
 
 .nav-links a::before {
@@ -329,7 +331,7 @@ header:hover {
 
 .btn-post, .btn-video {
   color: var(--text-primary) !important;
-  padding: 12px 20px;
+  padding: 1rem 1.25rem;
   border-radius: var(--radius-lg);
   font-weight: 600;
   cursor: pointer;
@@ -343,6 +345,9 @@ header:hover {
   background: transparent;
   position: relative;
   overflow: hidden;
+  min-width: fit-content;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .btn-post::before, .btn-video::before {
@@ -579,6 +584,8 @@ header:hover {
   white-space: nowrap;
   text-decoration: none;
   box-shadow: var(--shadow-md);
+  min-width: fit-content;
+  box-sizing: border-box;
 }
 
 .search-button:hover {
@@ -762,7 +769,7 @@ header:hover {
 
 .newsletter-form input {
   flex: 1;
-  padding: 1.125rem 1.5rem;
+  padding: 0.875rem 1.5rem;
   border: 2px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
@@ -771,6 +778,7 @@ header:hover {
   font-size: 1rem;
   transition: all var(--transition-base);
   box-shadow: var(--shadow-md);
+  box-sizing: border-box;
 }
 
 .newsletter-form input:focus {
@@ -786,7 +794,7 @@ header:hover {
 }
 
 .newsletter-form button {
-  padding: 1.125rem 2.5rem;
+  padding: 1rem 2.5rem;
   background: white;
   color: var(--primary);
   border: none;
@@ -797,6 +805,8 @@ header:hover {
   transition: all var(--transition-base);
   white-space: nowrap;
   box-shadow: var(--shadow-lg);
+  min-width: fit-content;
+  box-sizing: border-box;
 }
 
 .newsletter-form button:hover {
@@ -938,6 +948,7 @@ header:hover {
   background: white;
   color: var(--text-primary);
   transition: all var(--transition-base);
+  box-sizing: border-box;
 }
 
 .auth-form-container input:focus {
@@ -980,6 +991,9 @@ header:hover {
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
+  min-width: fit-content;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .btn-auth::before {
@@ -1077,6 +1091,7 @@ input, select, textarea {
   font-size: 1rem;
   font-family: inherit;
   transition: all var(--transition-base);
+  box-sizing: border-box;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -1093,7 +1108,7 @@ textarea {
 
 .btn-submit {
   width: 100%;
-  padding: 1.125rem;
+  padding: 1rem;
   background: var(--gradient-primary);
   color: white;
   border: none;
@@ -1108,6 +1123,9 @@ textarea {
   letter-spacing: 0.5px;
   position: relative;
   overflow: hidden;
+  min-width: fit-content;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .btn-submit::before {
@@ -2231,6 +2249,9 @@ textarea {
   align-items: center;
   gap: 0.75rem;
   box-shadow: var(--shadow-md);
+  min-width: fit-content;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .btn-apply {

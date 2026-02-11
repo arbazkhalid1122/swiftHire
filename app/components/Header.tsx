@@ -86,7 +86,11 @@ export default function Header() {
   };
 
   const isActive = (path: string) => {
-    if (path === '/' && pathname === '/') return true;
+    // For home page, check if we're on '/' or if admin is on home page
+    if (path === '/') {
+      return pathname === '/';
+    }
+    // For other paths, check if pathname starts with the path
     if (path !== '/' && pathname.startsWith(path)) return true;
     return false;
   };
@@ -108,23 +112,25 @@ export default function Header() {
               <Link href="/profile" className={isActive('/profile') ? 'active' : ''}>
                 Profilo
               </Link>
-              <Link 
-                href="/messages" 
-                className={isActive('/messages') ? 'active' : ''}
-                style={{ 
-                  color: 'var(--text-primary)', 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: 'var(--radius-lg)',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  position: 'relative'
-                }}
-              >
-                <i className="fas fa-envelope"></i>
-                Messaggi
-              </Link>
+              {user?.role !== 'admin' && (
+                <Link 
+                  href="/messages" 
+                  className={isActive('/messages') ? 'active' : ''}
+                  style={{ 
+                    color: 'var(--text-primary)', 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: 'var(--radius-lg)',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    position: 'relative'
+                  }}
+                >
+                  <i className="fas fa-envelope"></i>
+                  Messaggi
+                </Link>
+              )}
               {user?.role === 'admin' && (
                 <span style={{
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -194,21 +200,23 @@ export default function Header() {
                 <Link href="/profile" className={isActive('/profile') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
                   <i className="fas fa-user"></i> Profilo
                 </Link>
-                <Link 
-                  href="/messages" 
-                  className={isActive('/messages') ? 'active' : ''} 
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={{
-                    color: 'var(--text-primary)',
-                    fontWeight: '600',
-                    padding: '0.75rem 1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                  }}
-                >
-                  <i className="fas fa-envelope"></i> Messaggi
-                </Link>
+                {user?.role !== 'admin' && (
+                  <Link 
+                    href="/messages" 
+                    className={isActive('/messages') ? 'active' : ''} 
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{
+                      color: 'var(--text-primary)',
+                      fontWeight: '600',
+                      padding: '0.75rem 1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <i className="fas fa-envelope"></i> Messaggi
+                  </Link>
+                )}
                 <button onClick={handleLogout} className="mobile-nav-button">
                   <i className="fas fa-sign-out-alt"></i> Logout
                 </button>
