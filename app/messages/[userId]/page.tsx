@@ -502,8 +502,8 @@ export default function MessagesPage() {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
               <h2 style={{ margin: 0 }}>
-                Conversazione con {otherUser?.name || otherUser?.companyName || 'Utente'}
-              </h2>
+              Conversazione con {otherUser?.name || otherUser?.companyName || 'Utente'}
+            </h2>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',

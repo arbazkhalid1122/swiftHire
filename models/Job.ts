@@ -19,6 +19,13 @@ export interface IJob extends Document {
   jobType: 'full-time' | 'part-time' | 'contract' | 'internship';
   status: 'active' | 'closed' | 'draft';
   applications: mongoose.Types.ObjectId[];
+  // External source tracking
+  externalSource?: {
+    sourceId: mongoose.Types.ObjectId; // Reference to JobSource
+    externalId?: string; // External job ID from source
+    externalUrl?: string; // Original job URL
+    scrapedAt: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,6 +81,16 @@ const JobSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'JobApplication',
     }],
+    // External source tracking
+    externalSource: {
+      sourceId: {
+        type: Schema.Types.ObjectId,
+        ref: 'JobSource',
+      },
+      externalId: String,
+      externalUrl: String,
+      scrapedAt: Date,
+    },
   },
   {
     timestamps: true,
@@ -85,6 +102,7 @@ JobSchema.index({ companyId: 1, status: 1 });
 JobSchema.index({ status: 1, createdAt: -1 });
 JobSchema.index({ 'requirements.minExperience': 1 });
 JobSchema.index({ title: 'text', description: 'text' });
+JobSchema.index({ 'externalSource.sourceId': 1, 'externalSource.externalId': 1 }, { unique: true, sparse: true });
 
 export default mongoose.models.Job || mongoose.model<IJob>('Job', JobSchema);
 

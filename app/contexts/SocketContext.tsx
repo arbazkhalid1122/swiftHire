@@ -23,9 +23,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const connectSocket = () => {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
         // If no token, disconnect existing socket if any
         if (socketRef.current) {
           socketRef.current.close();
@@ -33,8 +33,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           setSocket(null);
           setIsConnected(false);
         }
-        return;
-      }
+      return;
+    }
 
       // Close existing socket if any
       if (socketRef.current) {
@@ -42,28 +42,28 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       }
 
       // Initialize socket connection with auto-reconnect
-      const socketInstance = io(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000', {
-        path: '/api/socket',
-        auth: {
-          token,
-        },
-        transports: ['websocket', 'polling'],
+    const socketInstance = io(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000', {
+      path: '/api/socket',
+      auth: {
+        token,
+      },
+      transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         reconnectionAttempts: maxReconnectAttempts,
         timeout: 20000,
-      });
+    });
 
-      socketInstance.on('connect', () => {
-        console.log('Socket connected');
-        setIsConnected(true);
+    socketInstance.on('connect', () => {
+      console.log('Socket connected');
+      setIsConnected(true);
         reconnectAttemptsRef.current = 0; // Reset on successful connection
-      });
+    });
 
       socketInstance.on('disconnect', (reason) => {
         console.log('Socket disconnected:', reason);
-        setIsConnected(false);
+      setIsConnected(false);
         
         // Only attempt manual reconnection if it wasn't intentional
         if (reason === 'io server disconnect') {
@@ -71,11 +71,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           reconnectAttemptsRef.current = 0;
           attemptReconnect();
         }
-      });
+    });
 
-      socketInstance.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-        setIsConnected(false);
+    socketInstance.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      setIsConnected(false);
         
         // Attempt reconnection with exponential backoff
         if (reconnectAttemptsRef.current < maxReconnectAttempts) {
@@ -104,7 +104,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
 
       socketRef.current = socketInstance;
-      setSocket(socketInstance);
+    setSocket(socketInstance);
     };
 
     const attemptReconnect = () => {

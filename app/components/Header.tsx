@@ -113,23 +113,23 @@ export default function Header() {
                 Profilo
               </Link>
               {user?.role !== 'admin' && (
-                <Link 
-                  href="/messages" 
-                  className={isActive('/messages') ? 'active' : ''}
-                  style={{ 
-                    color: 'var(--text-primary)', 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: 'var(--radius-lg)',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    position: 'relative'
-                  }}
-                >
-                  <i className="fas fa-envelope"></i>
-                  Messaggi
-                </Link>
+              <Link 
+                href="/messages" 
+                className={isActive('/messages') ? 'active' : ''}
+                style={{ 
+                  color: 'var(--text-primary)', 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: 'var(--radius-lg)',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  position: 'relative'
+                }}
+              >
+                <i className="fas fa-envelope"></i>
+                Messaggi
+              </Link>
               )}
               {user?.role === 'admin' && (
                 <span style={{
@@ -201,21 +201,21 @@ export default function Header() {
                   <i className="fas fa-user"></i> Profilo
                 </Link>
                 {user?.role !== 'admin' && (
-                  <Link 
-                    href="/messages" 
-                    className={isActive('/messages') ? 'active' : ''} 
-                    onClick={() => setMobileMenuOpen(false)}
-                    style={{
-                      color: 'var(--text-primary)',
-                      fontWeight: '600',
-                      padding: '0.75rem 1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    <i className="fas fa-envelope"></i> Messaggi
-                  </Link>
+                <Link 
+                  href="/messages" 
+                  className={isActive('/messages') ? 'active' : ''} 
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontWeight: '600',
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <i className="fas fa-envelope"></i> Messaggi
+                </Link>
                 )}
                 <button onClick={handleLogout} className="mobile-nav-button">
                   <i className="fas fa-sign-out-alt"></i> Logout

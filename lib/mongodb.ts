@@ -1,9 +1,12 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
-
-if (!MONGODB_URI) {
+// Lazy getter for MONGODB_URI to allow environment variables to load first
+function getMongoDBUri(): string {
+  const uri = process.env.MONGODB_URI || '';
+  if (!uri) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
+  }
+  return uri;
 }
 
 interface MongooseCache {
@@ -22,6 +25,9 @@ if (!global.mongoose) {
 }
 
 async function connectDB() {
+  // Check for MONGODB_URI when actually connecting, not at module load
+  const MONGODB_URI = getMongoDBUri();
+  
   if (cached.conn) {
     return cached.conn;
   }

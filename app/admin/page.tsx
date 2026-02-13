@@ -654,6 +654,30 @@ export default function AdminDashboard() {
                     <span style={{ fontWeight: '500' }}>Activity Logs</span>
                   </div>
                 </Link>
+                <Link href="/admin/job-sources" style={{ textDecoration: 'none' }}>
+                  <div style={{
+                    padding: '0.875rem 1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    color: 'var(--text-primary)',
+                    transition: 'all 0.2s',
+                    cursor: 'pointer',
+                    borderLeft: '3px solid transparent'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-secondary)';
+                    e.currentTarget.style.borderLeftColor = 'var(--primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderLeftColor = 'transparent';
+                  }}
+                  >
+                    <i className="fas fa-spider" style={{ width: '20px', color: '#3b82f6' }}></i>
+                    <span style={{ fontWeight: '500' }}>Job Sources</span>
+                  </div>
+                </Link>
               </nav>
             </div>
 

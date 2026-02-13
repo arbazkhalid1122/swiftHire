@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { initializeSocket } from './lib/socket';
+import { scrapingScheduler } from './lib/scrapingScheduler';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -25,6 +26,11 @@ app.prepare().then(() => {
   // Initialize Socket.IO
   initializeSocket(server);
 
+  // Start job scraping scheduler
+  scrapingScheduler.start().catch((err) => {
+    console.error('Failed to start scraping scheduler:', err);
+  });
+
   server
     .once('error', (err) => {
       console.error(err);
@@ -32,6 +38,16 @@ app.prepare().then(() => {
     })
     .listen(port, () => {
       console.log(`> Ready on http://${hostname}:${port}`);
+    });
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    scrapingScheduler.stop();
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
     });
 });
 

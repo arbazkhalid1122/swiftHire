@@ -95,7 +95,7 @@ export function initializeSocket(server: HTTPServer) {
         socket.emit('message_sent', { message: populatedMessage });
 
         // Emit to receiver's user room (always emit, socket.io handles if user is offline)
-        io?.to(`user:${receiverId}`).emit('new_message', { message: populatedMessage });
+          io?.to(`user:${receiverId}`).emit('new_message', { message: populatedMessage });
 
         // Also emit to conversation room for real-time updates
         const conversationId = [userId, receiverId].sort().join(':');
@@ -145,7 +145,7 @@ export function initializeSocket(server: HTTPServer) {
           
           senderIds.forEach((senderId) => {
             // Always emit to user room - socket.io handles if user is offline
-            io?.to(`user:${senderId}`).emit('messages_read', { messageIds, readBy: userId });
+              io?.to(`user:${senderId}`).emit('messages_read', { messageIds, readBy: userId });
           });
         }
       } catch (error) {
@@ -157,7 +157,7 @@ export function initializeSocket(server: HTTPServer) {
     socket.on('typing_start', (data) => {
       const { receiverId } = data;
       // Always emit to user room - socket.io handles if user is offline
-      io?.to(`user:${receiverId}`).emit('user_typing', { userId, isTyping: true });
+        io?.to(`user:${receiverId}`).emit('user_typing', { userId, isTyping: true });
       
       // Also emit to conversation room
       const conversationId = [userId, receiverId].sort().join(':');
@@ -167,7 +167,7 @@ export function initializeSocket(server: HTTPServer) {
     socket.on('typing_stop', (data) => {
       const { receiverId } = data;
       // Always emit to user room - socket.io handles if user is offline
-      io?.to(`user:${receiverId}`).emit('user_typing', { userId, isTyping: false });
+        io?.to(`user:${receiverId}`).emit('user_typing', { userId, isTyping: false });
       
       // Also emit to conversation room
       const conversationId = [userId, receiverId].sort().join(':');
