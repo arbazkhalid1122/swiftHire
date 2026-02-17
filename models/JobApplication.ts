@@ -7,6 +7,14 @@ export interface IJobApplication extends Document {
   coverLetter?: string;
   cvUrl?: string;
   videoCvUrl?: string;
+  // External application tracking (for Indeed, LinkedIn, etc.)
+  externalApplication?: {
+    submitted: boolean;
+    submittedAt?: Date;
+    externalUrl?: string;
+    submissionStatus?: 'pending' | 'success' | 'failed';
+    submissionMessage?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +45,20 @@ const JobApplicationSchema: Schema = new Schema(
     },
     videoCvUrl: {
       type: String,
+    },
+    // External application tracking
+    externalApplication: {
+      submitted: {
+        type: Boolean,
+        default: false,
+      },
+      submittedAt: Date,
+      externalUrl: String,
+      submissionStatus: {
+        type: String,
+        enum: ['pending', 'success', 'failed'],
+      },
+      submissionMessage: String,
     },
   },
   {

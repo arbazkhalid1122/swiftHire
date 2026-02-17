@@ -70,6 +70,8 @@ export class IndeedFeedParser {
       renderJs?: boolean;
       countryCode?: string;
       wait?: number;
+      premiumProxy?: boolean;
+      stealthProxy?: boolean;
     },
     useScrapingBeeOnly: boolean = false
   ): Promise<Array<{
@@ -146,33 +148,65 @@ export class IndeedFeedParser {
       if (!response.ok) {
         // If 403 or blocked, try ScrapingBee first (if configured), then Puppeteer
         if (response.status === 403 || response.status === 429) {
-          // Try ScrapingBee if configured
-          if (scrapingBeeOptions) {
-            console.warn('Indeed returned 403/429, trying with ScrapingBee...');
+          // Try ScrapingBee if configured (either explicitly or if API key exists)
+          const { ScrapingBee } = await import('./scrapingBee');
+          const scrapingBeeAvailable = scrapingBeeOptions || ScrapingBee.isConfigured();
+          
+          if (scrapingBeeAvailable) {
+            console.warn(`Indeed returned ${response.status}, trying with ScrapingBee...`);
             try {
-              const xmlText = await this.fetchWithScrapingBee(feedURL, scrapingBeeOptions);
+              // Use provided options or default options if ScrapingBee is configured
+              const options = scrapingBeeOptions || {
+                renderJs: true,
+                wait: 2000,
+              };
+              const xmlText = await this.fetchWithScrapingBee(feedURL, options);
               return this.parseXMLFeed(xmlText);
             } catch (scrapingBeeError: any) {
-              console.warn('ScrapingBee fetch failed, trying Puppeteer:', scrapingBeeError.message);
+              console.warn('ScrapingBee RSS fetch failed, trying search page fallback:', scrapingBeeError.message);
+              
+              // If RSS feed fails, try scraping the search page HTML instead
+              try {
+                const searchURL = this.convertRSSToSearchURL(feedURL);
+                const options = scrapingBeeOptions || {
+                  renderJs: true,
+                  wait: 3000,
+                  premiumProxy: true, // Use premium proxy for better success rate
+                };
+                const htmlJobs = await this.scrapeSearchPageWithScrapingBee(searchURL, options);
+                console.log(`Successfully scraped ${htmlJobs.length} jobs from search page HTML`);
+                return htmlJobs;
+              } catch (searchPageError: any) {
+                console.warn('Search page scraping also failed:', searchPageError.message);
+                // Continue to Puppeteer fallback if not using ScrapingBee only
+                if (!useScrapingBeeOnly) {
+                  console.warn('Trying Puppeteer as last resort...');
+                } else {
+                  throw new Error(`Indeed RSS feed returned ${response.status}. ScrapingBee failed: ${scrapingBeeError.message}. Search page also failed: ${searchPageError.message}`);
+                }
+              }
             }
           }
           
-          // Fallback to Puppeteer (only if ScrapingBee is not enabled)
+          // Fallback to Puppeteer (only if ScrapingBee is not enabled or not configured)
           if (!useScrapingBeeOnly) {
-            console.warn('Indeed returned 403/429, trying with Puppeteer (real browser)...');
+            console.warn(`Indeed returned ${response.status}, trying with Puppeteer (real browser)...`);
             try {
               const xmlText = await this.fetchWithPuppeteer(feedURL);
               return this.parseXMLFeed(xmlText);
             } catch (puppeteerError: any) {
               console.error('Puppeteer fetch also failed:', puppeteerError);
-              throw new Error(`Indeed RSS feed returned ${response.status}. All fallback methods failed: ${puppeteerError.message}. This may be due to rate limiting or access restrictions. Try again later or enable ScrapingBee.`);
+              const errorMsg = scrapingBeeAvailable
+                ? `Indeed RSS feed returned ${response.status}. ScrapingBee and Puppeteer both failed. This may be due to rate limiting or access restrictions.`
+                : `Indeed RSS feed returned ${response.status}. All fallback methods failed: ${puppeteerError.message}. This may be due to rate limiting or access restrictions. Try enabling ScrapingBee for better reliability.`;
+              throw new Error(errorMsg);
             }
           } else {
-            throw new Error(`Indeed RSS feed returned ${response.status}. ScrapingBee is enabled but not configured. Please check your ScrapingBee settings.`);
+            throw new Error(`Indeed RSS feed returned ${response.status}. ScrapingBee is enabled but failed. Please check your ScrapingBee settings.`);
           }
         }
         
-        throw new Error(`HTTP error! status: ${response.status}. ${response.status === 403 ? 'Indeed may be blocking the request. Try again later.' : ''}`);
+        throw new Error(`HTTP error! status: ${response.status}. ${response.status === 403 ? 'Indeed may be blocking the request. Try again later or enable ScrapingBee.' : ''}`);
       }
 
       const xmlText = await response.text();
@@ -192,6 +226,8 @@ export class IndeedFeedParser {
       renderJs?: boolean;
       countryCode?: string;
       wait?: number;
+      premiumProxy?: boolean;
+      stealthProxy?: boolean;
     }
   ): Promise<string> {
     const { ScrapingBee } = await import('./scrapingBee');
@@ -208,10 +244,14 @@ export class IndeedFeedParser {
         ? await ScrapingBee.fetchWithJS(feedURL, {
             countryCode: options.countryCode,
             wait: options.wait || 2000,
+            premiumProxy: options.premiumProxy,
+            stealthProxy: options.stealthProxy,
           })
         : await ScrapingBee.fetch(feedURL, {
             countryCode: options.countryCode,
             wait: options.wait,
+            premiumProxy: options.premiumProxy,
+            stealthProxy: options.stealthProxy,
           });
 
       // Check if we got an HTML error page instead of XML

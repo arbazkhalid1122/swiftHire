@@ -19,6 +19,10 @@ export default function JobDetailPage() {
     cvUrl: '',
     videoCvUrl: '',
   });
+  const [externalSubmissionStatus, setExternalSubmissionStatus] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -101,6 +105,7 @@ export default function JobDetailPage() {
     }
 
     setApplying(true);
+    setExternalSubmissionStatus(null);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/jobs/${params.id}/apply`, {
@@ -119,14 +124,36 @@ export default function JobDetailPage() {
         return;
       }
 
-      showToast('Candidatura inviata con successo!', 'success');
-      setShowApplicationForm(false);
+      // Check if this was an external application
+      if (data.externalSubmission) {
+        setExternalSubmissionStatus({
+          success: data.externalSubmission.success,
+          message: data.externalSubmission.message,
+        });
+        
+        if (data.externalSubmission.success) {
+          showToast('Candidatura inviata con successo a Indeed!', 'success');
+        } else {
+          showToast(data.warning || 'Candidatura salvata, ma potrebbe essere necessario applicare manualmente su Indeed', 'warning');
+        }
+      } else {
+        showToast('Candidatura inviata con successo!', 'success');
+      }
+      
+      // Don't close the form if external submission failed, so user can see the status
+      if (!data.externalSubmission || data.externalSubmission.success) {
+        setShowApplicationForm(false);
+      }
     } catch (error) {
       showToast('Errore di rete', 'error');
     } finally {
       setApplying(false);
     }
   };
+
+  // Check if this is an external Indeed job
+  const isExternalJob = job?.externalSource?.externalUrl;
+  const isIndeedJob = isExternalJob && job?.externalSource?.externalUrl?.includes('indeed.com');
 
   if (loading) {
     return (
@@ -229,13 +256,47 @@ export default function JobDetailPage() {
           )}
 
           {user && user.userType === 'candidate' && (
-            <button
-              onClick={() => setShowApplicationForm(true)}
-              className="btn-submit"
-              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
-            >
-              Candidati per questa posizione
-            </button>
+            <>
+              {isIndeedJob && (
+                <div style={{ 
+                  marginBottom: '1rem', 
+                  padding: '1rem', 
+                  background: 'var(--bg-secondary)', 
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--primary)',
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                    <i className="fas fa-info-circle" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
+                    Questa posizione proviene da Indeed. La tua candidatura verrà inviata direttamente a Indeed.
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={() => setShowApplicationForm(true)}
+                className="btn-submit"
+                style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
+              >
+                {isIndeedJob ? 'Candidati su Indeed' : 'Candidati per questa posizione'}
+              </button>
+              {isExternalJob && !isIndeedJob && (
+                <a
+                  href={job.externalSource?.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'block',
+                    marginTop: '0.5rem',
+                    textAlign: 'center',
+                    color: 'var(--primary)',
+                    textDecoration: 'none',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
+                  Vedi posizione originale
+                </a>
+              )}
+            </>
           )}
 
           {user && (user.userType === 'company' || user.role === 'admin') && (job.companyId?._id === user._id || user.role === 'admin') && (
@@ -293,10 +354,17 @@ export default function JobDetailPage() {
                 borderBottom: '2px solid var(--border-light)'
               }}>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '1.75rem', color: 'var(--primary)' }}>Candidati per questa posizione</h2>
+                  <h2 style={{ margin: 0, fontSize: '1.75rem', color: 'var(--primary)' }}>
+                    {isIndeedJob ? 'Candidati su Indeed' : 'Candidati per questa posizione'}
+                  </h2>
                   <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
                     {job.title} - {job.companyId?.companyName || job.companyId?.name}
                   </p>
+                  {isIndeedJob && (
+                    <p style={{ margin: '0.5rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                      La tua candidatura verrà inviata automaticamente a Indeed utilizzando i dati del tuo profilo.
+                    </p>
+                  )}
                 </div>
                 <button onClick={() => setShowApplicationForm(false)} style={{ 
                   background: 'none', 
@@ -412,6 +480,46 @@ export default function JobDetailPage() {
                   </div>
                 </div>
 
+                {externalSubmissionStatus && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    borderRadius: 'var(--radius-md)',
+                    background: externalSubmissionStatus.success 
+                      ? 'rgba(34, 197, 94, 0.1)' 
+                      : 'rgba(239, 68, 68, 0.1)',
+                    border: `1px solid ${externalSubmissionStatus.success ? '#22c55e' : '#ef4444'}`,
+                  }}>
+                    <p style={{ 
+                      margin: 0, 
+                      color: externalSubmissionStatus.success ? '#22c55e' : '#ef4444',
+                      fontSize: '0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}>
+                      <i className={`fas ${externalSubmissionStatus.success ? 'fa-check-circle' : 'fa-exclamation-triangle'}`}></i>
+                      {externalSubmissionStatus.message}
+                    </p>
+                    {!externalSubmissionStatus.success && isIndeedJob && (
+                      <a
+                        href={job.externalSource?.externalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-block',
+                          marginTop: '0.5rem',
+                          color: 'var(--primary)',
+                          textDecoration: 'none',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
+                        Applica manualmente su Indeed
+                      </a>
+                    )}
+                  </div>
+                )}
                 <div style={{ 
                   position: 'sticky', 
                   bottom: 0, 
@@ -433,12 +541,12 @@ export default function JobDetailPage() {
                     {applying ? (
                       <>
                         <i className="fas fa-spinner fa-spin"></i>
-                        Invio in corso...
+                        {isIndeedJob ? 'Invio a Indeed in corso...' : 'Invio in corso...'}
                       </>
                     ) : (
                       <>
                         <i className="fas fa-paper-plane"></i>
-                        Invia Candidatura
+                        {isIndeedJob ? 'Invia a Indeed' : 'Invia Candidatura'}
                       </>
                     )}
                   </button>
@@ -448,7 +556,9 @@ export default function JobDetailPage() {
                     textAlign: 'center', 
                     marginTop: '0.75rem' 
                   }}>
-                    La tua candidatura verrà inviata all'azienda per la revisione
+                    {isIndeedJob 
+                      ? 'La tua candidatura verrà inviata automaticamente a Indeed'
+                      : 'La tua candidatura verrà inviata all\'azienda per la revisione'}
                   </p>
                 </div>
               </form>
