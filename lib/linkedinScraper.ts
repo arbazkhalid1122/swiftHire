@@ -222,7 +222,7 @@ export class LinkedInScraper {
       'div[class*="job-card"]',
     ];
 
-    let jobElements: cheerio.Cheerio<cheerio.Element> | null = null;
+    let jobElements: cheerio.Cheerio<any> | null = null;
 
     for (const selector of jobSelectors) {
       const elements = $(selector);

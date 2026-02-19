@@ -43,6 +43,7 @@ export default function JobSourcesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingSource, setEditingSource] = useState<JobSource | null>(null);
   const [scraping, setScraping] = useState<string | null>(null);
+  const [testingXML, setTestingXML] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     url: '',
@@ -82,6 +83,11 @@ export default function JobSourcesPage() {
   const [linkedInParams, setLinkedInParams] = useState({
     query: '',
     location: '',
+  });
+  const [showXMLHelper, setShowXMLHelper] = useState(false);
+  const [xmlParams, setXmlParams] = useState({
+    partnerName: '',
+    feedUrl: '',
   });
 
   useEffect(() => {
@@ -253,7 +259,22 @@ export default function JobSourcesPage() {
       type: source.type,
       isActive: source.isActive,
       scrapeInterval: source.scrapeInterval,
-      scrapingConfig: source.scrapingConfig || {},
+      scrapingConfig: {
+        jobListSelector: source.scrapingConfig?.jobListSelector || '',
+        jobItemSelector: source.scrapingConfig?.jobItemSelector || '',
+        titleSelector: source.scrapingConfig?.titleSelector || '',
+        descriptionSelector: source.scrapingConfig?.descriptionSelector || '',
+        locationSelector: source.scrapingConfig?.locationSelector || '',
+        salarySelector: source.scrapingConfig?.salarySelector || '',
+        linkSelector: source.scrapingConfig?.linkSelector || '',
+        usePuppeteer: source.scrapingConfig?.usePuppeteer || false,
+        useScrapingBee: source.scrapingConfig?.useScrapingBee || false,
+        scrapingBeeOptions: {
+          renderJs: source.scrapingConfig?.scrapingBeeOptions?.renderJs !== false,
+          countryCode: source.scrapingConfig?.scrapingBeeOptions?.countryCode || '',
+          wait: source.scrapingConfig?.scrapingBeeOptions?.wait || 2000,
+        },
+      },
     });
     setShowForm(true);
   };
@@ -298,6 +319,11 @@ export default function JobSourcesPage() {
     setLinkedInParams({
       query: '',
       location: '',
+    });
+    setShowXMLHelper(false);
+    setXmlParams({
+      partnerName: '',
+      feedUrl: '',
     });
   };
 
@@ -384,6 +410,9 @@ export default function JobSourcesPage() {
             </button>
             <button
               onClick={() => {
+                resetForm();
+                setEditingSource(null);
+                setShowXMLHelper(true);
                 setShowForm(true);
                 setFormData({ ...formData, type: 'xml' });
                 setShowIndeedHelper(false);
@@ -393,6 +422,27 @@ export default function JobSourcesPage() {
               style={{
                 padding: '0.75rem 1.5rem',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                fontWeight: '600',
+              }}
+            >
+              <i className="fas fa-handshake"></i> Add Partnership XML Feed
+            </button>
+            <button
+              onClick={() => {
+                setShowForm(true);
+                setFormData({ ...formData, type: 'xml' });
+                setShowIndeedHelper(false);
+                setShowJoobleHelper(false);
+                setShowLinkedInHelper(false);
+                setShowXMLHelper(false);
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: 'var(--radius-md)',
@@ -689,6 +739,155 @@ export default function JobSourcesPage() {
                   >
                     Generate LinkedIn Search URL
                   </button>
+                </div>
+              )}
+              {showXMLHelper && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  padding: '1.5rem',
+                  borderRadius: 'var(--radius-md)',
+                  marginBottom: '1.5rem',
+                }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>
+                    <i className="fas fa-handshake" style={{ marginRight: '0.5rem' }}></i>
+                    Partnership XML Feed
+                  </h3>
+                  <p style={{ marginBottom: '1rem', opacity: 0.9, fontSize: '0.95rem' }}>
+                    Enter the partner name and XML feed URL provided by your partner (e.g., Adecco, Randstad, Manpower).
+                    The system will automatically import jobs from the XML feed.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Partner Name *</label>
+                      <input
+                        type="text"
+                        value={xmlParams.partnerName}
+                        onChange={(e) => setXmlParams({ ...xmlParams, partnerName: e.target.value })}
+                        placeholder="e.g., Adecco, Randstad, Manpower..."
+                        style={{ width: '100%', padding: '0.75rem', border: 'none', borderRadius: 'var(--radius-md)', color: '#1a1a1a' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>XML Feed URL *</label>
+                      <input
+                        type="url"
+                        value={xmlParams.feedUrl}
+                        onChange={(e) => setXmlParams({ ...xmlParams, feedUrl: e.target.value })}
+                        placeholder="https://api.partner.it/jobs.xml"
+                        style={{ width: '100%', padding: '0.75rem', border: 'none', borderRadius: 'var(--radius-md)', color: '#1a1a1a' }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                    fontSize: '0.875rem',
+                  }}>
+                    <strong>📋 Expected XML Format:</strong>
+                    <pre style={{ marginTop: '0.5rem', fontSize: '0.8rem', overflow: 'auto', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px' }}>
+{`<source>
+  <job>
+    <title>Job Title</title>
+    <referencenumber>REF-12345</referencenumber>
+    <url>https://...</url>
+    <company>Company Name</company>
+    <description>Job description...</description>
+    <city>Milan</city>
+    <salary>€35,000 - €40,000</salary>
+  </job>
+</source>`}
+                    </pre>
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!xmlParams.feedUrl) {
+                          alert('Please enter XML feed URL to test');
+                          return;
+                        }
+                        setTestingXML(true);
+                        try {
+                          const token = localStorage.getItem('token');
+                          const response = await fetch('/api/admin/job-sources/test-xml', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${token}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              feedUrl: xmlParams.feedUrl,
+                              useScrapingBee: formData.scrapingConfig?.useScrapingBee || false,
+                              scrapingBeeOptions: formData.scrapingConfig?.scrapingBeeOptions,
+                            }),
+                          });
+
+                          const data = await response.json();
+
+                          if (!response.ok) {
+                            showToast(data.message || data.error || 'Failed to test XML feed', 'error');
+                            return;
+                          }
+
+                          if (data.count === 0) {
+                            showToast('XML feed parsed successfully but no jobs found. Check the feed URL.', 'warning');
+                          } else {
+                            showToast(`✅ Success! Found ${data.count} job(s) in the feed.`, 'success');
+                          }
+                        } catch (err) {
+                          showToast('Network error. Please try again.', 'error');
+                        } finally {
+                          setTestingXML(false);
+                        }
+                      }}
+                      disabled={testingXML}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: testingXML ? 'not-allowed' : 'pointer',
+                        fontWeight: '600',
+                        opacity: testingXML ? 0.6 : 1,
+                      }}
+                    >
+                      <i className={`fas ${testingXML ? 'fa-spinner fa-spin' : 'fa-vial'}`} style={{ marginRight: '0.5rem' }}></i>
+                      {testingXML ? 'Testing...' : 'Test Feed'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!xmlParams.partnerName || !xmlParams.feedUrl) {
+                          alert('Please enter both partner name and XML feed URL');
+                          return;
+                        }
+                        setFormData({
+                          ...formData,
+                          name: `${xmlParams.partnerName} XML Feed`,
+                          url: xmlParams.feedUrl,
+                          type: 'xml',
+                        });
+                        setShowXMLHelper(false);
+                      }}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        background: 'white',
+                        color: '#f59e0b',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                      }}
+                    >
+                      <i className="fas fa-sync" style={{ marginRight: '0.5rem' }}></i>
+                      Configure XML Feed
+                    </button>
+                  </div>
                 </div>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>

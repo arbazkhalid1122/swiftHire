@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const status = searchParams.get('status');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
 
     let query: any = {};
 
@@ -43,9 +46,14 @@ export async function GET(request: NextRequest) {
       query.status = status;
     }
 
+    // Get total count for pagination
+    const totalCount = await Job.countDocuments(query);
+
     const jobs = await Job.find(query)
       .populate('companyId', 'name companyName email location')
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
     // Get application counts
@@ -59,7 +67,19 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    return NextResponse.json({ jobs: jobsWithCounts }, { status: 200 });
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return NextResponse.json({ 
+      jobs: jobsWithCounts,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      }
+    }, { status: 200 });
   } catch (error: any) {
     console.error('Get admin jobs error:', error);
     return NextResponse.json(

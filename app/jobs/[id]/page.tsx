@@ -132,12 +132,26 @@ export default function JobDetailPage() {
         });
         
         if (data.externalSubmission.success) {
-          showToast('Candidatura inviata con successo a Indeed!', 'success');
+          showToast('Candidatura inviata con successo!', 'success');
         } else {
-          showToast(data.warning || 'Candidatura salvata, ma potrebbe essere necessario applicare manualmente su Indeed', 'warning');
+          showToast('Candidatura salvata. Potrebbe essere necessario completare il processo.', 'warning');
         }
       } else {
         showToast('Candidatura inviata con successo!', 'success');
+      }
+      
+      // Optional redirect for external jobs after successful save
+      if (isExternalJob && data.externalSubmission?.shouldRedirect && data.externalSubmission?.redirectUrl) {
+        const redirectDelay = data.externalSubmission.redirectDelay || 2000;
+        // Wait for configured delay then optionally redirect (user can cancel)
+        setTimeout(() => {
+          const shouldRedirect = confirm(
+            'La tua candidatura è stata salvata. Vuoi essere reindirizzato alla pagina originale per completare il processo?'
+          );
+          if (shouldRedirect) {
+            window.open(data.externalSubmission.redirectUrl, '_blank');
+          }
+        }, redirectDelay);
       }
       
       // Don't close the form if external submission failed, so user can see the status
@@ -257,45 +271,15 @@ export default function JobDetailPage() {
 
           {user && user.userType === 'candidate' && (
             <>
-              {isIndeedJob && (
-                <div style={{ 
-                  marginBottom: '1rem', 
-                  padding: '1rem', 
-                  background: 'var(--bg-secondary)', 
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--primary)',
-                }}>
-                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                    <i className="fas fa-info-circle" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
-                    Questa posizione proviene da Indeed. La tua candidatura verrà inviata direttamente a Indeed.
-                  </p>
-                </div>
-              )}
+              {/* Hide external job indicators - show only SwiftHire branding */}
               <button
                 onClick={() => setShowApplicationForm(true)}
                 className="btn-submit"
                 style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
               >
-                {isIndeedJob ? 'Candidati su Indeed' : 'Candidati per questa posizione'}
+                Candidati per questa posizione
               </button>
-              {isExternalJob && !isIndeedJob && (
-                <a
-                  href={job.externalSource?.externalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'block',
-                    marginTop: '0.5rem',
-                    textAlign: 'center',
-                    color: 'var(--primary)',
-                    textDecoration: 'none',
-                    fontSize: '0.9rem',
-                  }}
-                >
-                  <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
-                  Vedi posizione originale
-                </a>
-              )}
+              {/* External link only shown after application is submitted (if needed) */}
             </>
           )}
 
@@ -499,9 +483,11 @@ export default function JobDetailPage() {
                       gap: '0.5rem',
                     }}>
                       <i className={`fas ${externalSubmissionStatus.success ? 'fa-check-circle' : 'fa-exclamation-triangle'}`}></i>
-                      {externalSubmissionStatus.message}
+                      {externalSubmissionStatus.success 
+                        ? 'Candidatura inviata con successo!' 
+                        : 'Candidatura salvata. Potrebbe essere necessario completare il processo manualmente.'}
                     </p>
-                    {!externalSubmissionStatus.success && isIndeedJob && (
+                    {!externalSubmissionStatus.success && isExternalJob && (
                       <a
                         href={job.externalSource?.externalUrl}
                         target="_blank"
@@ -515,7 +501,7 @@ export default function JobDetailPage() {
                         }}
                       >
                         <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
-                        Applica manualmente su Indeed
+                        Completa la candidatura
                       </a>
                     )}
                   </div>

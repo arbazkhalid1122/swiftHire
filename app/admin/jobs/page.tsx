@@ -13,6 +13,8 @@ export default function AdminJobs() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [jobs, setJobs] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
 
   useEffect(() => {
     checkAuth();
@@ -20,7 +22,7 @@ export default function AdminJobs() {
 
   useEffect(() => {
     if (isAdmin) {
-      fetchJobs();
+      fetchJobs(1);
     }
   }, [isAdmin, searchTerm]);
 
@@ -60,12 +62,14 @@ export default function AdminJobs() {
     }
   };
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (page: number = 1) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
+      params.append('page', page.toString());
+      params.append('limit', '20');
 
       const response = await fetch(`/api/admin/jobs?${params.toString()}`, {
         headers: {
@@ -76,6 +80,8 @@ export default function AdminJobs() {
       if (response.ok) {
         const data = await response.json();
         setJobs(data.jobs || []);
+        setPagination(data.pagination);
+        setCurrentPage(page);
       } else {
         showToast('Failed to fetch jobs', 'error');
       }
@@ -137,7 +143,7 @@ export default function AdminJobs() {
                 <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i>
                 Create New Job
               </Link>
-              <button className="btn-submit" onClick={fetchJobs} style={{ background: '#666' }}>
+              <button className="btn-submit" onClick={() => fetchJobs(1)} style={{ background: '#666' }}>
                 <i className="fas fa-sync-alt" style={{ marginRight: '0.5rem' }}></i>
                 Refresh
               </button>
@@ -291,6 +297,59 @@ export default function AdminJobs() {
                 )}
               </tbody>
             </table>
+            
+            {/* Pagination Controls */}
+            {pagination && pagination.totalPages > 1 && (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                gap: '0.5rem', 
+                marginTop: '2rem',
+                padding: '1rem',
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  onClick={() => fetchJobs(currentPage - 1)}
+                  disabled={!pagination.hasPrevPage}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: pagination.hasPrevPage ? 'var(--primary)' : 'var(--bg-secondary)',
+                    color: pagination.hasPrevPage ? 'white' : 'var(--text-secondary)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: pagination.hasPrevPage ? 'pointer' : 'not-allowed',
+                    opacity: pagination.hasPrevPage ? 1 : 0.5,
+                  }}
+                >
+                  <i className="fas fa-chevron-left"></i> Precedente
+                </button>
+                
+                <span style={{ 
+                  padding: '0.5rem 1rem',
+                  color: 'var(--text-primary)',
+                  fontWeight: '600'
+                }}>
+                  Pagina {pagination.page} di {pagination.totalPages} ({pagination.totalCount} totali)
+                </span>
+                
+                <button
+                  onClick={() => fetchJobs(currentPage + 1)}
+                  disabled={!pagination.hasNextPage}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: pagination.hasNextPage ? 'var(--primary)' : 'var(--bg-secondary)',
+                    color: pagination.hasNextPage ? 'white' : 'var(--text-secondary)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: pagination.hasNextPage ? 'pointer' : 'not-allowed',
+                    opacity: pagination.hasNextPage ? 1 : 0.5,
+                  }}
+                >
+                  Successiva <i className="fas fa-chevron-right"></i>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

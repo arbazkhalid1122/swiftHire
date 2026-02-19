@@ -115,7 +115,6 @@ export class GenericRSSParser {
       attributeNamePrefix: '',
       textNodeName: '_text',
       parseAttributeValue: true,
-      ignoreNameSpace: true,
     });
 
     const parsed: any = parser.parse(xmlText);

@@ -14,27 +14,49 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     const location = searchParams.get('location');
     const jobType = searchParams.get('jobType');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '12');
+    const skip = (page - 1) * limit;
 
-    let query: any = { status: 'active' };
+    // Build query with all conditions using $and
+    const andConditions: any[] = [
+      { status: 'active' },
+      {
+        $or: [
+          { expiresAt: { $exists: false } }, // Jobs without expiration
+          { expiresAt: { $gt: new Date() } }, // Jobs that haven't expired yet
+        ],
+      },
+    ];
 
     if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-      ];
+      andConditions.push({
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+        ],
+      });
     }
 
     if (location) {
-      query.location = { $regex: location, $options: 'i' };
+      andConditions.push({ location: { $regex: location, $options: 'i' } });
     }
 
     if (jobType) {
-      query.jobType = jobType;
+      andConditions.push({ jobType });
     }
 
+    const query = { $and: andConditions };
+
+    // Get total count for pagination
+    const totalCount = await Job.countDocuments(query);
+
+    // Fetch jobs with pagination
     let jobs = await Job.find(query)
       .populate('companyId', 'name companyName email location')
-      .sort({ createdAt: -1 })
+      .sort({ viewCount: -1, createdAt: -1 }) // Sort by view count (most viewed first), then by creation date
+      .skip(skip)
+      .limit(limit)
       .lean();
 
     // Smart ranking: If user is authenticated and is a candidate, rank jobs by match
@@ -45,7 +67,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ jobs }, { status: 200 });
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return NextResponse.json({ 
+      jobs,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      }
+    }, { status: 200 });
   } catch (error: any) {
     console.error('Get jobs error:', error);
     return NextResponse.json(
@@ -84,6 +118,7 @@ export async function POST(request: NextRequest) {
       salary,
       requirements,
       jobType,
+      expiresAt,
     } = body;
 
     // Use the authenticated user's company ID
@@ -98,6 +133,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Calculate expiration date if expirationDuration is provided
+    let calculatedExpiresAt: Date | undefined;
+    if (expiresAt) {
+      calculatedExpiresAt = new Date(expiresAt);
+    }
+
     const job = new Job({
       companyId: finalCompanyId,
       title,
@@ -107,6 +148,8 @@ export async function POST(request: NextRequest) {
       requirements: requirements || {},
       jobType: jobType || 'full-time',
       status: 'active',
+      expiresAt: calculatedExpiresAt,
+      viewCount: 0,
     });
 
     await job.save();

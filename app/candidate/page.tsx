@@ -14,6 +14,8 @@ export default function CandidateDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'search' | 'cv' | 'video-cv' | 'applications' | 'messages'>('search');
   const [jobs, setJobs] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [jobTypeFilter, setJobTypeFilter] = useState('');
@@ -41,6 +43,15 @@ export default function CandidateDashboard() {
   const [userLanguages, setUserLanguages] = useState<Array<{name: string, level: string}>>([]);
   const [userCertifications, setUserCertifications] = useState<Array<{name: string, date?: string}>>([]);
   const [userEducation, setUserEducation] = useState<Array<any>>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [teleprompterText, setTeleprompterText] = useState('Inizia a parlare della tua esperienza in ambito professionale... focalizzati sulle tue soft skills e sui risultati raggiunti negli ultimi anni.');
+  const [teleprompterPosition, setTeleprompterPosition] = useState(150);
+  const [teleprompterInterval, setTeleprompterInterval] = useState<NodeJS.Timeout | null>(null);
   const [experienceForm, setExperienceForm] = useState({
     companyName: '',
     position: '',
@@ -156,13 +167,15 @@ export default function CandidateDashboard() {
     }
   };
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (page: number = 1) => {
     try {
       const token = localStorage.getItem('token');
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (locationFilter) params.append('location', locationFilter);
       if (jobTypeFilter) params.append('jobType', jobTypeFilter);
+      params.append('page', page.toString());
+      params.append('limit', '12');
 
       const response = await fetch(`/api/jobs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -171,6 +184,8 @@ export default function CandidateDashboard() {
       if (response.ok) {
         const data = await response.json();
         setJobs(data.jobs || []);
+        setPagination(data.pagination);
+        setCurrentPage(page);
       }
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -251,6 +266,156 @@ export default function CandidateDashboard() {
       console.error('Error fetching messages:', error);
     }
   };
+
+  // Video CV Recording Functions
+  const startVideoRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }, 
+        audio: true 
+      });
+      
+      setMediaStream(stream);
+      setIsRecording(true);
+      setRecordedChunks([]);
+      setVideoUrl(null);
+
+      const videoElement = document.getElementById('video-preview') as HTMLVideoElement;
+      if (videoElement) {
+        videoElement.srcObject = stream;
+      }
+
+      // Start MediaRecorder
+      const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+      let recorder: MediaRecorder;
+      
+      try {
+        recorder = new MediaRecorder(stream, options);
+      } catch (e) {
+        // Fallback to default codec
+        recorder = new MediaRecorder(stream);
+      }
+
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        setVideoUrl(url);
+        setRecordedChunks(chunks);
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+
+      // Start teleprompter animation
+      if (teleprompterText) {
+        let pos = 150;
+        const interval = setInterval(() => {
+          pos -= 0.5;
+          if (pos < -300) pos = 150;
+          setTeleprompterPosition(pos);
+        }, 30);
+        setTeleprompterInterval(interval);
+      }
+    } catch (error: any) {
+      console.error('Error starting video recording:', error);
+      showToast('Errore nell\'accesso alla telecamera: ' + (error.message || 'Permesso negato'), 'error');
+    }
+  };
+
+  const stopVideoRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      setMediaStream(null);
+    }
+
+    if (teleprompterInterval) {
+      clearInterval(teleprompterInterval);
+      setTeleprompterInterval(null);
+    }
+
+    setIsRecording(false);
+  };
+
+  const saveVideoCV = async () => {
+    if (!videoUrl || recordedChunks.length === 0) {
+      showToast('Nessun video da salvare', 'error');
+      return;
+    }
+
+    setUploadingVideo(true);
+    try {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const formData = new FormData();
+      formData.append('file', blob, `video-cv-${Date.now()}.webm`);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/upload/video-cv', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.error || 'Errore nel salvataggio del video CV', 'error');
+        setUploadingVideo(false);
+        return;
+      }
+
+      showToast('Video CV salvato con successo!', 'success');
+      
+      // Update user state
+      if (user) {
+        setUser({ ...user, videoCvUrl: data.videoCvUrl });
+      }
+      
+      // Clean up
+      URL.revokeObjectURL(videoUrl);
+      setVideoUrl(null);
+      setRecordedChunks([]);
+      
+      // Refresh user data
+      checkAuth();
+    } catch (error) {
+      console.error('Error saving video CV:', error);
+      showToast('Errore di rete durante il salvataggio', 'error');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      if (teleprompterInterval) {
+        clearInterval(teleprompterInterval);
+      }
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+    };
+  }, []);
 
   // Profile Builder Handlers
   const handleAddSkill = async () => {
@@ -880,7 +1045,7 @@ export default function CandidateDashboard() {
                   <option value="internship">Stage</option>
                 </select>
                 <button
-                  onClick={fetchJobs}
+                  onClick={() => fetchJobs(1)}
                   className="btn-submit"
                   style={{ whiteSpace: 'nowrap', width: 'auto', minWidth: 'fit-content', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 0, padding: '1rem' }}
                 >
@@ -977,6 +1142,58 @@ export default function CandidateDashboard() {
                     </div>
                   </div>
                 ))}
+                
+                {/* Pagination Controls */}
+                {pagination && pagination.totalPages > 1 && (
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    gap: '0.5rem', 
+                    marginTop: '2rem',
+                    flexWrap: 'wrap'
+                  }}>
+                    <button
+                      onClick={() => fetchJobs(currentPage - 1)}
+                      disabled={!pagination.hasPrevPage}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: pagination.hasPrevPage ? 'var(--primary)' : 'var(--bg-secondary)',
+                        color: pagination.hasPrevPage ? 'white' : 'var(--text-secondary)',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: pagination.hasPrevPage ? 'pointer' : 'not-allowed',
+                        opacity: pagination.hasPrevPage ? 1 : 0.5,
+                      }}
+                    >
+                      <i className="fas fa-chevron-left"></i> Precedente
+                    </button>
+                    
+                    <span style={{ 
+                      padding: '0.5rem 1rem',
+                      color: 'var(--text-primary)',
+                      fontWeight: '600'
+                    }}>
+                      Pagina {pagination.page} di {pagination.totalPages}
+                    </span>
+                    
+                    <button
+                      onClick={() => fetchJobs(currentPage + 1)}
+                      disabled={!pagination.hasNextPage}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: pagination.hasNextPage ? 'var(--primary)' : 'var(--bg-secondary)',
+                        color: pagination.hasNextPage ? 'white' : 'var(--text-secondary)',
+                        border: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        cursor: pagination.hasNextPage ? 'pointer' : 'not-allowed',
+                        opacity: pagination.hasNextPage ? 1 : 0.5,
+                      }}
+                    >
+                      Successiva <i className="fas fa-chevron-right"></i>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1112,630 +1329,232 @@ export default function CandidateDashboard() {
           <div>
             <div style={{ marginBottom: '2rem' }}>
               <h2 style={{ marginBottom: '0.5rem', color: 'var(--primary)' }}>
-                <i className="fas fa-user-edit" style={{ marginRight: '0.5rem' }}></i>
-                Il Mio Profilo
+                <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i>
+                Video CV Professional
               </h2>
               <p style={{ color: 'var(--text-secondary)' }}>
-                Completa il tuo profilo aggiungendo tutte le informazioni per migliorare le tue possibilità di trovare lavoro.
+                Registra un video CV professionale. Leggi il testo che scorre e guarda la telecamera.
               </p>
             </div>
 
-            {/* Unified Profile Section */}
-            <div className="card" style={{ padding: '2rem' }}>
-              {/* Years of Experience Section */}
-              <div style={{ marginBottom: '3rem', paddingBottom: '2rem', borderBottom: '2px solid var(--border-light)' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <i className="fas fa-clock" style={{ color: 'var(--primary)' }}></i>
-                  Anni di Esperienza
-                </h3>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                  Indica i tuoi anni totali di esperienza lavorativa.
-                </p>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input
-                    type="number"
-                    value={yearsOfExperience}
-                    onChange={(e) => setYearsOfExperience(e.target.value)}
-                    placeholder="0"
-                    min="0"
-                    step="0.5"
-                    style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--border-light)', 
+            {!isRecording && !videoUrl && (
+              <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
+                <div style={{ marginBottom: '2rem' }}>
+                  <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '600', textAlign: 'left' }}>
+                    <i className="fas fa-scroll" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
+                    Testo Teleprompter (opzionale)
+                  </label>
+                  <textarea
+                    value={teleprompterText}
+                    onChange={(e) => setTeleprompterText(e.target.value)}
+                    placeholder="Inizia a parlare della tua esperienza in ambito professionale... focalizzati sulle tue soft skills e sui risultati raggiunti negli ultimi anni."
+                    rows={5}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '1px solid var(--border-light)',
                       borderRadius: 'var(--radius-md)',
                       fontSize: '1rem',
-                      width: '200px'
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
                     }}
                   />
-                  <button
-                    onClick={handleUpdateYearsOfExperience}
-                    className="btn-submit"
-                    disabled={!yearsOfExperience || parseFloat(yearsOfExperience) < 0}
-                  >
-                    <i className="fas fa-save" style={{ marginRight: '0.5rem' }}></i>
-                    Salva
-                  </button>
-                  {totalExperience > 0 && (
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                      <i className="fas fa-info-circle" style={{ marginRight: '0.5rem' }}></i>
-                      Esperienza calcolata dalle tue esperienze lavorative: {totalExperience.toFixed(1)} anni
-                    </span>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                    Questo testo scorrerà durante la registrazione per aiutarti a mantenere il discorso fluido.
+                  </p>
+                </div>
+                <button
+                  onClick={startVideoRecording}
+                  className="btn-submit"
+                  style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}
+                >
+                  <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i>
+                  Inizia Registrazione Video CV
+                </button>
+              </div>
+            )}
+
+            {isRecording && (
+              <div className="card" style={{ padding: '2rem' }}>
+                <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--primary)' }}>
+                  <i className="fas fa-circle" style={{ color: 'var(--error)', marginRight: '0.5rem', animation: 'pulse 1s infinite' }}></i>
+                  Registrazione in Corso
+                </h3>
+                
+                <div style={{ 
+                  position: 'relative', 
+                  width: '100%', 
+                  maxWidth: '800px', 
+                  margin: '0 auto',
+                  background: '#000',
+                  borderRadius: 'var(--radius-lg)',
+                  overflow: 'hidden'
+                }}>
+                  {/* Teleprompter */}
+                  {teleprompterText && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '20%',
+                      left: 0,
+                      width: '100%',
+                      height: '150px',
+                      background: 'rgba(0,0,0,0.7)',
+                      color: '#fff',
+                      padding: '20px',
+                      overflow: 'hidden',
+                      pointerEvents: 'none',
+                      zIndex: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <div
+                        id="teleprompter-text"
+                        style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          transform: `translateY(${teleprompterPosition}px)`,
+                          whiteSpace: 'pre-wrap',
+                          wordWrap: 'break-word',
+                        }}
+                      >
+                        {teleprompterText}
+                      </div>
+                    </div>
                   )}
-                </div>
-              </div>
-
-              {/* Skills Section */}
-              <div style={{ marginBottom: '3rem', paddingBottom: '2rem', borderBottom: '2px solid var(--border-light)' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <i className="fas fa-code" style={{ color: 'var(--primary)' }}></i>
-                  Le Tue Competenze
-                </h3>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                  Aggiungi le competenze tecniche e professionali che possiedi. Queste aiuteranno le aziende a trovarti più facilmente.
-                </p>
-
-                {/* Add Skill Form */}
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '0.75rem', 
-                  marginBottom: '2rem',
-                  flexWrap: 'wrap'
-                }}>
-                  <input
-                    type="text"
-                    value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddSkill()}
-                    placeholder="Es: JavaScript, React, Python..."
-                    style={{ 
-                      flex: '1', 
-                      minWidth: '200px',
-                      padding: '0.75rem', 
-                      border: '1px solid var(--border-light)', 
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '1rem'
+                  
+                  <video
+                    id="video-preview"
+                    autoPlay
+                    muted
+                    playsInline
+                    style={{
+                      width: '100%',
+                      display: 'block',
+                      borderRadius: 'var(--radius-lg)',
                     }}
                   />
+                </div>
+
+                <div style={{ textAlign: 'center', marginTop: '2rem' }}>
                   <button
-                    onClick={handleAddSkill}
+                    onClick={stopVideoRecording}
                     className="btn-submit"
-                    style={{ whiteSpace: 'nowrap' }}
+                    style={{
+                      padding: '1rem 2rem',
+                      fontSize: '1.1rem',
+                      background: 'var(--error)',
+                    }}
                   >
-                    <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i>
-                    Aggiungi
+                    <i className="fas fa-stop" style={{ marginRight: '0.5rem' }}></i>
+                    Termina Registrazione
                   </button>
                 </div>
-
-                {/* Skills List */}
-                {userSkills.length === 0 ? (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '3rem', 
-                    background: 'var(--bg-secondary)', 
-                    borderRadius: 'var(--radius-lg)',
-                    border: '2px dashed var(--border-light)'
-                  }}>
-                    <i className="fas fa-code" style={{ fontSize: '3rem', color: 'var(--text-tertiary)', marginBottom: '1rem' }}></i>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Nessuna competenza aggiunta</p>
-                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Inizia ad aggiungere le tue competenze qui sopra</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    {userSkills.map((skill, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '0.75rem 1rem',
-                          background: 'linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%)',
-                          color: 'white',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '0.875rem',
-                          fontWeight: '500',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                        }}
-                      >
-                        <span>{skill}</span>
-                        <button
-                          onClick={() => handleRemoveSkill(skill)}
-                          style={{
-                            background: 'rgba(255,255,255,0.2)',
-                            border: 'none',
-                            color: 'white',
-                            borderRadius: '50%',
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.75rem',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
+            )}
 
-              {/* Education Section */}
-              <div style={{ marginBottom: '3rem', paddingBottom: '2rem', borderBottom: '2px solid var(--border-light)' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <i className="fas fa-graduation-cap" style={{ color: 'var(--primary)' }}></i>
-                  La Tua Formazione
+            {videoUrl && !isRecording && (
+              <div className="card" style={{ padding: '2rem' }}>
+                <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--primary)' }}>
+                  <i className="fas fa-check-circle" style={{ color: 'var(--success)', marginRight: '0.5rem' }}></i>
+                  Video CV Registrato
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                  Aggiungi i tuoi titoli di studio, diplomi e lauree.
-                </p>
-
-                {/* Add Education Form */}
-                <form onSubmit={handleAddEducation} style={{ marginBottom: '2rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-                        Titolo di Studio *
-                      </label>
-                      <select
-                        value={educationForm.degree}
-                        onChange={(e) => setEducationForm({ ...educationForm, degree: e.target.value })}
-                        required
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.75rem', 
-                          border: '1px solid var(--border-light)', 
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '1rem'
-                        }}
-                      >
-                        <option value="">Seleziona...</option>
-                        <option value="Laurea Magistrale">Laurea Magistrale</option>
-                        <option value="Laurea Triennale">Laurea Triennale</option>
-                        <option value="Laurea">Laurea</option>
-                        <option value="Master">Master</option>
-                        <option value="Dottorato">Dottorato</option>
-                        <option value="Diploma">Diploma</option>
-                        <option value="Altro">Altro</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-                        Istituzione *
-                      </label>
-                      <input
-                        type="text"
-                        value={educationForm.institution}
-                        onChange={(e) => setEducationForm({ ...educationForm, institution: e.target.value })}
-                        required
-                        placeholder="Università, Scuola..."
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.75rem', 
-                          border: '1px solid var(--border-light)', 
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '1rem'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-                      Campo di Studio
-                    </label>
-                    <input
-                      type="text"
-                      value={educationForm.field}
-                      onChange={(e) => setEducationForm({ ...educationForm, field: e.target.value })}
-                      placeholder="Es: Informatica, Ingegneria..."
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.75rem', 
-                        border: '1px solid var(--border-light)', 
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: '1rem'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-                        Data Inizio
-                      </label>
-                      <input
-                        type="date"
-                        value={educationForm.startDate}
-                        onChange={(e) => setEducationForm({ ...educationForm, startDate: e.target.value })}
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.75rem', 
-                          border: '1px solid var(--border-light)', 
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '1rem'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-                        Data Fine
-                      </label>
-                      <input
-                        type="date"
-                        value={educationForm.endDate}
-                        onChange={(e) => setEducationForm({ ...educationForm, endDate: e.target.value })}
-                        disabled={educationForm.isCurrent}
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.75rem', 
-                          border: '1px solid var(--border-light)', 
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '1rem'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={educationForm.isCurrent}
-                        onChange={(e) => setEducationForm({ ...educationForm, isCurrent: e.target.checked })}
-                      />
-                      <span>In corso</span>
-                    </label>
-                  </div>
-
-                  <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-                      Descrizione (opzionale)
-                    </label>
-                    <textarea
-                      value={educationForm.description}
-                      onChange={(e) => setEducationForm({ ...educationForm, description: e.target.value })}
-                      rows={3}
-                      placeholder="Menziona progetti, tesi, o risultati importanti..."
-                      style={{ 
-                        width: '100%', 
-                        padding: '0.75rem', 
-                        border: '1px solid var(--border-light)', 
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: '1rem',
-                        resize: 'vertical'
-                      }}
-                    />
-                  </div>
-
-                  <button type="submit" className="btn-submit" style={{ width: '100%' }}>
-                    <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i>
-                    Aggiungi Formazione
-                  </button>
-                </form>
-
-                {/* Education List */}
-                {userEducation.length === 0 ? (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '3rem', 
-                    background: 'var(--bg-secondary)', 
-                    borderRadius: 'var(--radius-lg)',
-                    border: '2px dashed var(--border-light)'
-                  }}>
-                    <i className="fas fa-graduation-cap" style={{ fontSize: '3rem', color: 'var(--text-tertiary)', marginBottom: '1rem' }}></i>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Nessuna formazione aggiunta</p>
-                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Compila il modulo qui sopra per aggiungere la tua formazione</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {userEducation.map((edu: any, idx: number) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '1.5rem',
-                          background: 'var(--bg-card)',
-                          borderRadius: 'var(--radius-lg)',
-                          border: '1px solid var(--border-light)',
-                          position: 'relative',
-                        }}
-                      >
-                        <button
-                          onClick={() => handleRemoveEducation(idx)}
-                          style={{
-                            position: 'absolute',
-                            top: '1rem',
-                            right: '1rem',
-                            background: 'var(--error)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '30px',
-                            height: '30px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.875rem',
-                          }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                        <h4 style={{ marginBottom: '0.5rem', color: 'var(--primary)', fontSize: '1.125rem' }}>
-                          {edu.degree}
-                        </h4>
-                        <p style={{ color: 'var(--text-primary)', marginBottom: '0.25rem', fontWeight: '600' }}>
-                          {edu.institution}
-                        </p>
-                        {edu.field && (
-                          <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                            {edu.field}
-                          </p>
-                        )}
-                        {(edu.startDate || edu.endDate) && (
-                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                            <i className="fas fa-calendar" style={{ marginRight: '0.5rem' }}></i>
-                            {edu.startDate ? new Date(edu.startDate).toLocaleDateString('it-IT') : ''} - {edu.isCurrent ? 'Presente' : (edu.endDate ? new Date(edu.endDate).toLocaleDateString('it-IT') : '')}
-                          </p>
-                        )}
-                        {edu.description && (
-                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                            {edu.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Languages Section */}
-              <div style={{ marginBottom: '3rem', paddingBottom: '2rem', borderBottom: '2px solid var(--border-light)' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <i className="fas fa-language" style={{ color: 'var(--primary)' }}></i>
-                  Le Tue Lingue
-                </h3>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                  Aggiungi le lingue che conosci e il tuo livello di competenza.
-                </p>
-
-                {/* Add Language Form */}
+                
                 <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '2fr 1fr auto', 
-                  gap: '0.75rem', 
-                  marginBottom: '2rem',
-                  flexWrap: 'wrap'
+                  width: '100%', 
+                  maxWidth: '800px', 
+                  margin: '0 auto 2rem',
+                  background: '#000',
+                  borderRadius: 'var(--radius-lg)',
+                  overflow: 'hidden'
                 }}>
-                  <input
-                    type="text"
-                    value={newLanguage}
-                    onChange={(e) => setNewLanguage(e.target.value)}
-                    placeholder="Es: Inglese, Francese, Tedesco..."
-                    style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--border-light)', 
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '1rem'
+                  <video
+                    src={videoUrl}
+                    controls
+                    style={{
+                      width: '100%',
+                      display: 'block',
                     }}
                   />
-                  <select
-                    value={newLanguageLevel}
-                    onChange={(e) => setNewLanguageLevel(e.target.value)}
-                    style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--border-light)', 
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    <option value="">Livello...</option>
-                    <option value="Base">Base</option>
-                    <option value="Intermedio">Intermedio</option>
-                    <option value="Avanzato">Avanzato</option>
-                    <option value="Madrelingua">Madrelingua</option>
-                  </select>
-                  <button
-                    onClick={handleAddLanguage}
-                    className="btn-submit"
-                    disabled={!newLanguage.trim() || !newLanguageLevel}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    <i className="fas fa-plus"></i>
-                  </button>
                 </div>
 
-                {/* Languages List */}
-                {userLanguages.length === 0 ? (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '3rem', 
-                    background: 'var(--bg-secondary)', 
-                    borderRadius: 'var(--radius-lg)',
-                    border: '2px dashed var(--border-light)'
-                  }}>
-                    <i className="fas fa-language" style={{ fontSize: '3rem', color: 'var(--text-tertiary)', marginBottom: '1rem' }}></i>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Nessuna lingua aggiunta</p>
-                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Aggiungi le lingue che conosci qui sopra</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {userLanguages.map((lang, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '1rem',
-                          background: 'var(--bg-card)',
-                          borderRadius: 'var(--radius-md)',
-                          border: '1px solid var(--border-light)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <div>
-                          <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{lang.name}</span>
-                          <span style={{ 
-                            marginLeft: '1rem', 
-                            padding: '0.25rem 0.75rem', 
-                            background: 'var(--bg-secondary)', 
-                            borderRadius: 'var(--radius-full)',
-                            fontSize: '0.875rem',
-                            color: 'var(--text-secondary)'
-                          }}>
-                            {lang.level}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveLanguage(idx)}
-                          style={{
-                            background: 'var(--error)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '30px',
-                            height: '30px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.875rem',
-                          }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => {
+                      setVideoUrl(null);
+                      setRecordedChunks([]);
+                    }}
+                    className="btn-submit"
+                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                  >
+                    <i className="fas fa-redo" style={{ marginRight: '0.5rem' }}></i>
+                    Registra Nuovo Video
+                  </button>
+                  <button
+                    onClick={saveVideoCV}
+                    className="btn-submit"
+                    disabled={uploadingVideo}
+                  >
+                    {uploadingVideo ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
+                        Salvataggio...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-save" style={{ marginRight: '0.5rem' }}></i>
+                        Salva Video CV
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+            )}
 
-              {/* Certifications Section */}
-              <div style={{ marginBottom: '0' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <i className="fas fa-certificate" style={{ color: 'var(--primary)' }}></i>
-                  Le Tue Certificazioni
+            {user?.videoCvUrl && (
+              <div className="card" style={{ padding: '2rem', marginTop: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>
+                  <i className="fas fa-video" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
+                  Il Mio Video CV Attuale
                 </h3>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                  Aggiungi le certificazioni professionali che hai ottenuto.
-                </p>
-
-                {/* Add Certification Form */}
                 <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: '2fr 1fr auto', 
-                  gap: '0.75rem', 
-                  marginBottom: '2rem',
-                  flexWrap: 'wrap'
+                  width: '100%', 
+                  maxWidth: '800px', 
+                  margin: '0 auto',
+                  background: '#000',
+                  borderRadius: 'var(--radius-lg)',
+                  overflow: 'hidden'
                 }}>
-                  <input
-                    type="text"
-                    value={newCertification}
-                    onChange={(e) => setNewCertification(e.target.value)}
-                    placeholder="Es: AWS Certified, Google Analytics..."
-                    style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--border-light)', 
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '1rem'
+                  <video
+                    src={user.videoCvUrl}
+                    controls
+                    style={{
+                      width: '100%',
+                      display: 'block',
                     }}
                   />
-                  <input
-                    type="month"
-                    value={newCertificationDate}
-                    onChange={(e) => setNewCertificationDate(e.target.value)}
-                    placeholder="Data"
-                    style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--border-light)', 
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '1rem'
-                    }}
-                  />
-                  <button
-                    onClick={handleAddCertification}
-                    className="btn-submit"
-                    disabled={!newCertification.trim()}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    <i className="fas fa-plus"></i>
-                  </button>
                 </div>
-
-                {/* Certifications List */}
-                {userCertifications.length === 0 ? (
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '3rem', 
-                    background: 'var(--bg-secondary)', 
-                    borderRadius: 'var(--radius-lg)',
-                    border: '2px dashed var(--border-light)'
-                  }}>
-                    <i className="fas fa-certificate" style={{ fontSize: '3rem', color: 'var(--text-tertiary)', marginBottom: '1rem' }}></i>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Nessuna certificazione aggiunta</p>
-                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Aggiungi le tue certificazioni qui sopra</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {userCertifications.map((cert, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '1rem',
-                          background: 'var(--bg-card)',
-                          borderRadius: 'var(--radius-md)',
-                          border: '1px solid var(--border-light)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <i className="fas fa-certificate" style={{ color: 'var(--primary)', fontSize: '1.25rem' }}></i>
-                          <div>
-                            <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{cert.name}</span>
-                            {cert.date && (
-                              <span style={{ 
-                                marginLeft: '1rem', 
-                                fontSize: '0.875rem',
-                                color: 'var(--text-secondary)'
-                              }}>
-                                {new Date(cert.date).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveCertification(idx)}
-                          style={{
-                            background: 'var(--error)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '30px',
-                            height: '30px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.875rem',
-                          }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                  <a
+                    href={user.videoCvUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: 'var(--primary)',
+                      textDecoration: 'none',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
+                    Apri in nuova scheda
+                  </a>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
+
 
         {activeTab === 'applications' && (
           <div>

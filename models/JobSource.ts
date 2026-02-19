@@ -22,6 +22,14 @@ export interface IJobSource extends Document {
       wait?: number; // Wait time in milliseconds
     };
   };
+  applicationConfig?: {
+    submissionMethod?: 'auto' | 'redirect' | 'manual'; // How to handle applications
+    autoSubmit?: boolean; // Whether to auto-submit to partner platform
+    redirectAfterSave?: boolean; // Whether to redirect after saving application
+    redirectDelay?: number; // Delay in milliseconds before redirect (default: 2000)
+    customSubmissionUrl?: string; // Custom submission endpoint if needed
+    requiresManualStep?: boolean; // Whether manual step is required
+  };
   lastScrapedAt?: Date;
   lastSuccessAt?: Date;
   lastError?: string;
@@ -72,6 +80,30 @@ const JobSourceSchema: Schema = new Schema(
         renderJs: Boolean,
         countryCode: String,
         wait: Number,
+      },
+    },
+    applicationConfig: {
+      submissionMethod: {
+        type: String,
+        enum: ['auto', 'redirect', 'manual'],
+        default: 'redirect',
+      },
+      autoSubmit: {
+        type: Boolean,
+        default: false,
+      },
+      redirectAfterSave: {
+        type: Boolean,
+        default: true,
+      },
+      redirectDelay: {
+        type: Number,
+        default: 2000, // 2 seconds
+      },
+      customSubmissionUrl: String,
+      requiresManualStep: {
+        type: Boolean,
+        default: false,
       },
     },
     lastScrapedAt: Date,

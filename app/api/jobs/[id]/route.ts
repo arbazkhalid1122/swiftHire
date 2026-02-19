@@ -24,6 +24,11 @@ export async function GET(
       );
     }
 
+    // Increment view count (async, don't wait for it)
+    Job.findByIdAndUpdate(id, { $inc: { viewCount: 1 } }).catch(err => 
+      console.error('Error incrementing view count:', err)
+    );
+
     return NextResponse.json({ job }, { status: 200 });
   } catch (error: any) {
     console.error('Get job error:', error);

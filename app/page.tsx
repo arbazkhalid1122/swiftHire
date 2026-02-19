@@ -20,6 +20,8 @@ export default function Home() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -72,12 +74,15 @@ export default function Home() {
     setLoading(false);
   };
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (page: number = 1) => {
     try {
-      const response = await fetch('/api/jobs?limit=6');
+      setLoadingJobs(true);
+      const response = await fetch(`/api/jobs?page=${page}&limit=12`);
       if (response.ok) {
         const data = await response.json();
         setJobs(data.jobs || []);
+        setPagination(data.pagination);
+        setCurrentPage(page);
       }
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -332,6 +337,58 @@ export default function Home() {
                   </button>
                 </div>
               ))}
+              
+              {/* Pagination Controls */}
+              {pagination && pagination.totalPages > 1 && (
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  gap: '0.5rem', 
+                  marginTop: '2rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <button
+                    onClick={() => fetchJobs(currentPage - 1)}
+                    disabled={!pagination.hasPrevPage}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: pagination.hasPrevPage ? 'var(--primary)' : 'var(--bg-secondary)',
+                      color: pagination.hasPrevPage ? 'white' : 'var(--text-secondary)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: pagination.hasPrevPage ? 'pointer' : 'not-allowed',
+                      opacity: pagination.hasPrevPage ? 1 : 0.5,
+                    }}
+                  >
+                    <i className="fas fa-chevron-left"></i> Precedente
+                  </button>
+                  
+                  <span style={{ 
+                    padding: '0.5rem 1rem',
+                    color: 'var(--text-primary)',
+                    fontWeight: '600'
+                  }}>
+                    Pagina {pagination.page} di {pagination.totalPages}
+                  </span>
+                  
+                  <button
+                    onClick={() => fetchJobs(currentPage + 1)}
+                    disabled={!pagination.hasNextPage}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: pagination.hasNextPage ? 'var(--primary)' : 'var(--bg-secondary)',
+                      color: pagination.hasNextPage ? 'white' : 'var(--text-secondary)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: pagination.hasNextPage ? 'pointer' : 'not-allowed',
+                      opacity: pagination.hasNextPage ? 1 : 0.5,
+                    }}
+                  >
+                    Successiva <i className="fas fa-chevron-right"></i>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

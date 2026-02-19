@@ -26,6 +26,7 @@ export default function CompanyDashboard() {
     skills: '',
     salaryMin: '',
     salaryMax: '',
+    expirationDuration: '', // 1 week, 2 weeks, 1 month, 2 months, 3 months
   });
 
   useEffect(() => {
@@ -179,6 +180,24 @@ export default function CompanyDashboard() {
 
     try {
       const token = localStorage.getItem('token');
+      
+      // Calculate expiration date based on selected duration
+      let expiresAt: Date | undefined;
+      if (jobForm.expirationDuration) {
+        const now = new Date();
+        const durationMap: Record<string, number> = {
+          '1week': 7,
+          '2weeks': 14,
+          '1month': 30,
+          '2months': 60,
+          '3months': 90,
+        };
+        const days = durationMap[jobForm.expirationDuration] || 0;
+        if (days > 0) {
+          expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+        }
+      }
+
       const response = await fetch('/api/jobs', {
         method: 'POST',
         headers: {
@@ -200,6 +219,7 @@ export default function CompanyDashboard() {
             max: jobForm.salaryMax ? parseInt(jobForm.salaryMax) : undefined,
             currency: 'EUR',
           },
+          expiresAt: expiresAt?.toISOString(),
         }),
       });
 
@@ -222,6 +242,7 @@ export default function CompanyDashboard() {
         skills: '',
         salaryMin: '',
         salaryMax: '',
+        expirationDuration: '',
       });
       fetchJobs();
       setActiveTab('jobs');
@@ -595,6 +616,25 @@ export default function CompanyDashboard() {
                       style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
                     />
                   </div>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Durata Annuncio</label>
+                  <select
+                    value={jobForm.expirationDuration}
+                    onChange={(e) => setJobForm({ ...jobForm, expirationDuration: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                  >
+                    <option value="">Nessuna scadenza</option>
+                    <option value="1week">1 Settimana</option>
+                    <option value="2weeks">2 Settimane</option>
+                    <option value="1month">1 Mese</option>
+                    <option value="2months">2 Mesi</option>
+                    <option value="3months">3 Mesi</option>
+                  </select>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    L'annuncio scadrà automaticamente dopo il periodo selezionato
+                  </p>
                 </div>
 
                 <div style={{ 

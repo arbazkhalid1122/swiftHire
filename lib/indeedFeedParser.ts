@@ -3,14 +3,14 @@ import puppeteer from 'puppeteer';
 import * as cheerio from 'cheerio';
 
 interface IndeedRSSItem {
-  title?: string;
-  link?: string;
-  description?: string;
-  pubDate?: string;
-  guid?: string;
-  'job:location'?: string;
-  'job:company'?: string;
-  'job:salary'?: string;
+  title?: string | { _text?: string };
+  link?: string | { _text?: string };
+  description?: string | { _text?: string };
+  pubDate?: string | { _text?: string };
+  guid?: string | { _text?: string };
+  'job:location'?: string | { _text?: string };
+  'job:company'?: string | { _text?: string };
+  'job:salary'?: string | { _text?: string };
 }
 
 interface IndeedRSSFeed {
@@ -242,16 +242,16 @@ export class IndeedFeedParser {
       // For RSS feeds, we typically don't need JS rendering, but use it if specified
       const html = options?.renderJs
         ? await ScrapingBee.fetchWithJS(feedURL, {
-            countryCode: options.countryCode,
-            wait: options.wait || 2000,
-            premiumProxy: options.premiumProxy,
-            stealthProxy: options.stealthProxy,
+            countryCode: options?.countryCode,
+            wait: options?.wait || 2000,
+            premiumProxy: options?.premiumProxy,
+            stealthProxy: options?.stealthProxy,
           })
         : await ScrapingBee.fetch(feedURL, {
-            countryCode: options.countryCode,
-            wait: options.wait,
-            premiumProxy: options.premiumProxy,
-            stealthProxy: options.stealthProxy,
+            countryCode: options?.countryCode,
+            wait: options?.wait,
+            premiumProxy: options?.premiumProxy,
+            stealthProxy: options?.stealthProxy,
           });
 
       // Check if we got an HTML error page instead of XML
@@ -497,14 +497,6 @@ export class IndeedFeedParser {
   }
 
   /**
-   * Clean text content
-   */
-  private static cleanText(text: string): string {
-    if (!text) return '';
-    return text.replace(/\s+/g, ' ').trim();
-  }
-
-  /**
    * Fetch RSS feed using Puppeteer (real browser)
    */
   private static async fetchWithPuppeteer(feedURL: string): Promise<string> {
@@ -683,7 +675,6 @@ export class IndeedFeedParser {
       attributeNamePrefix: '',
       textNodeName: '_text',
       parseAttributeValue: true,
-      ignoreNameSpace: true,
     });
 
     const parsed: IndeedRSSFeed = parser.parse(xmlText);
@@ -709,13 +700,27 @@ export class IndeedFeedParser {
 
     for (const item of itemsArray) {
       try {
-        const title = item.title?._text || item.title || '';
-        const description = item.description?._text || item.description || '';
-        const link = item.link?._text || item.link || '';
-        const location = item['job:location']?._text || item['job:location'] || '';
-        const company = item['job:company']?._text || item['job:company'] || '';
-        const salary = item['job:salary']?._text || item['job:salary'] || '';
-        const pubDate = item.pubDate?._text || item.pubDate;
+        const title: string = typeof item.title === 'object' && item.title !== null && '_text' in item.title 
+          ? (item.title._text || '')
+          : (typeof item.title === 'string' ? item.title : '');
+        const description: string = typeof item.description === 'object' && item.description !== null && '_text' in item.description
+          ? (item.description._text || '')
+          : (typeof item.description === 'string' ? item.description : '');
+        const link: string = typeof item.link === 'object' && item.link !== null && '_text' in item.link
+          ? (item.link._text || '')
+          : (typeof item.link === 'string' ? item.link : '');
+        const location: string = typeof item['job:location'] === 'object' && item['job:location'] !== null && '_text' in item['job:location']
+          ? (item['job:location']._text || '')
+          : (typeof item['job:location'] === 'string' ? item['job:location'] : '');
+        const company: string = typeof item['job:company'] === 'object' && item['job:company'] !== null && '_text' in item['job:company']
+          ? (item['job:company']._text || '')
+          : (typeof item['job:company'] === 'string' ? item['job:company'] : '');
+        const salary: string = typeof item['job:salary'] === 'object' && item['job:salary'] !== null && '_text' in item['job:salary']
+          ? (item['job:salary']._text || '')
+          : (typeof item['job:salary'] === 'string' ? item['job:salary'] : '');
+        const pubDate: string | undefined = typeof item.pubDate === 'object' && item.pubDate !== null && '_text' in item.pubDate
+          ? item.pubDate._text
+          : (typeof item.pubDate === 'string' ? item.pubDate : undefined);
 
         if (!title || !description) {
           continue;

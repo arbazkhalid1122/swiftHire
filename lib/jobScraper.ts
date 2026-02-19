@@ -8,6 +8,7 @@ import { IndeedFeedParser } from './indeedFeedParser';
 import { JoobleScraper } from './joobleScraper';
 import { GenericRSSParser } from './genericRSSParser';
 import { LinkedInScraper } from './linkedinScraper';
+import { XMLFeedParser } from './xmlFeedParser';
 
 interface ScrapedJob {
   title: string;
@@ -76,7 +77,32 @@ export class JobScraper {
       }
     }
     
-    if (source.type === 'xml' || finalUrl.includes('.rss') || finalUrl.includes('/rss') || 
+    // Handle XML feed type (partnership feeds like Adecco, Randstad)
+    if (source.type === 'xml' && (finalUrl.endsWith('.xml') || finalUrl.includes('xml'))) {
+      try {
+        console.log('Processing XML feed:', finalUrl);
+        const xmlJobs = await XMLFeedParser.fetchXMLFeed(
+          finalUrl,
+          {
+            useScrapingBee: source.scrapingConfig?.useScrapingBee || false,
+            scrapingBeeOptions: source.scrapingConfig?.scrapingBeeOptions,
+          }
+        );
+        jobs = xmlJobs.map(job => ({
+          title: job.title,
+          description: job.description,
+          location: job.location,
+          salary: job.salary,
+          jobType: job.jobType || this.determineJobType(job.title + ' ' + job.description),
+          externalUrl: job.externalUrl,
+          externalId: job.externalId, // Use referencenumber as externalId
+        }));
+        console.log(`XML parser found ${jobs.length} jobs`);
+      } catch (error: any) {
+        console.error('XML feed parsing failed:', error);
+        throw new Error(`Failed to parse XML feed: ${error.message}`);
+      }
+    } else if (source.type === 'xml' || finalUrl.includes('.rss') || finalUrl.includes('/rss') || 
         finalUrl.includes('feed') || finalUrl.endsWith('.xml') || 
         finalUrl.includes('indeed.com/rss')) {
       // Handle RSS/XML feeds - use generic parser for all RSS feeds
@@ -236,14 +262,14 @@ export class JobScraper {
       if (options?.renderJs) {
         // Use JavaScript rendering (for dynamic content)
         return await ScrapingBee.fetchWithJS(url, {
-          countryCode: options.countryCode,
-          wait: options.wait,
+          countryCode: options?.countryCode,
+          wait: options?.wait,
         });
       } else {
         // Standard fetch
         return await ScrapingBee.fetch(url, {
-          countryCode: options.countryCode,
-          wait: options.wait,
+          countryCode: options?.countryCode,
+          wait: options?.wait,
         });
       }
     } catch (error: any) {
@@ -358,16 +384,16 @@ export class JobScraper {
   /**
    * Extract text using selector
    */
-  private static extractText($: cheerio.CheerioAPI, selector: string): string | undefined {
-    const element = $(selector).first();
+  private static extractText($item: cheerio.Cheerio<any>, selector: string): string | undefined {
+    const element = $item.find(selector).first();
     return element.text()?.trim() || element.attr('content') || undefined;
   }
 
   /**
    * Extract link using selector
    */
-  private static extractLink($: cheerio.CheerioAPI, selector: string): string | undefined {
-    const element = $(selector).first();
+  private static extractLink($item: cheerio.Cheerio<any>, selector: string): string | undefined {
+    const element = $item.find(selector).first();
     return element.attr('href') || undefined;
   }
 

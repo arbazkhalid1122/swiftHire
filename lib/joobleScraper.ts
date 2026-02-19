@@ -388,7 +388,7 @@ export class JoobleScraper {
       'li[class*="job"]',
     ];
 
-    let jobElements: cheerio.Cheerio<cheerio.Element> | null = null;
+    let jobElements: cheerio.Cheerio<any> | null = null;
 
     for (const selector of jobSelectors) {
       const elements = $(selector);

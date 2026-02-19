@@ -140,6 +140,62 @@ export async function sendNewsletterUpdate(email: string, subject: string, conte
   }
 }
 
+export async function sendApplicationReceivedEmail(
+  companyEmail: string,
+  candidateName: string,
+  jobTitle: string,
+  jobId: string,
+  hasCV: boolean,
+  hasVideoCV: boolean
+) {
+  try {
+    const applicationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/jobs/${jobId}/applications`;
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: companyEmail,
+      subject: `Nuova candidatura ricevuta: ${jobTitle} - SwiftHire Pro`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+          <div style="background: linear-gradient(135deg, #800000 0%, #990000 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">SwiftHire Pro</h1>
+          </div>
+          <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 10px 10px;">
+            <div style="background: white; padding: 25px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="color: #800000; margin-top: 0;">Nuova candidatura ricevuta!</h2>
+              <p style="color: #1e293b; font-size: 16px; margin-bottom: 20px;">
+                Hai ricevuto una nuova candidatura per la posizione:
+              </p>
+              <h3 style="color: #1e293b; margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 8px;">
+                ${jobTitle}
+              </h3>
+              <div style="margin: 20px 0;">
+                <p style="color: #64748b; margin: 10px 0;">
+                  <strong>Candidato:</strong> ${candidateName}
+                </p>
+                ${hasCV ? '<p style="color: #22c55e; margin: 10px 0;"><i class="fas fa-file-pdf"></i> CV PDF incluso</p>' : ''}
+                ${hasVideoCV ? '<p style="color: #22c55e; margin: 10px 0;"><i class="fas fa-video"></i> Video CV incluso</p>' : ''}
+              </div>
+              <a href="${applicationUrl}" style="display: inline-block; background: #800000; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 20px;">
+                Visualizza Candidatura
+              </a>
+            </div>
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+              <p style="color: #64748b; font-size: 12px; margin: 0;">
+                Questa email è stata inviata automaticamente da SwiftHire Pro.<br>
+                Non rispondere a questa email.
+              </p>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error sending application received email:', error);
+    return false;
+  }
+}
+
 export async function sendJobNotificationEmail(email: string, job: any) {
   try {
     const jobUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/jobs/${job._id}`;

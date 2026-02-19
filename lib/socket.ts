@@ -82,12 +82,13 @@ export function initializeSocket(server: HTTPServer) {
 
         // Convert ObjectId to string for consistency
         if (populatedMessage) {
-          populatedMessage._id = populatedMessage._id.toString();
-          if (populatedMessage.senderId && (populatedMessage.senderId as any)._id) {
-            (populatedMessage.senderId as any)._id = (populatedMessage.senderId as any)._id.toString();
+          const msg = populatedMessage as any;
+          msg._id = msg._id.toString();
+          if (msg.senderId && msg.senderId._id) {
+            msg.senderId._id = msg.senderId._id.toString();
           }
-          if (populatedMessage.receiverId && (populatedMessage.receiverId as any)._id) {
-            (populatedMessage.receiverId as any)._id = (populatedMessage.receiverId as any)._id.toString();
+          if (msg.receiverId && msg.receiverId._id) {
+            msg.receiverId._id = msg.receiverId._id.toString();
           }
         }
 

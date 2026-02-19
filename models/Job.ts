@@ -19,6 +19,8 @@ export interface IJob extends Document {
   jobType: 'full-time' | 'part-time' | 'contract' | 'internship';
   status: 'active' | 'closed' | 'draft';
   applications: mongoose.Types.ObjectId[];
+  viewCount: number;
+  expiresAt?: Date;
   // External source tracking
   externalSource?: {
     sourceId: mongoose.Types.ObjectId; // Reference to JobSource
@@ -81,6 +83,13 @@ const JobSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'JobApplication',
     }],
+    viewCount: {
+      type: Number,
+      default: 0,
+    },
+    expiresAt: {
+      type: Date,
+    },
     // External source tracking
     externalSource: {
       sourceId: {
@@ -100,6 +109,8 @@ const JobSchema: Schema = new Schema(
 // Indexes for faster queries
 JobSchema.index({ companyId: 1, status: 1 });
 JobSchema.index({ status: 1, createdAt: -1 });
+JobSchema.index({ status: 1, viewCount: -1 }); // For ranking by views
+JobSchema.index({ expiresAt: 1 }); // For filtering expired jobs
 JobSchema.index({ 'requirements.minExperience': 1 });
 JobSchema.index({ title: 'text', description: 'text' });
 JobSchema.index({ 'externalSource.sourceId': 1, 'externalSource.externalId': 1 }, { unique: true, sparse: true });

@@ -70,6 +70,7 @@ export async function extractCVData(pdfBuffer: Buffer): Promise<ExtractedCVData>
     ];
 
     const textLower = text.toLowerCase();
+    const linesLower = text.toLowerCase().split('\n');
     const foundSkills = new Set<string>();
     
     // Direct match
@@ -102,7 +103,6 @@ export async function extractCVData(pdfBuffer: Buffer): Promise<ExtractedCVData>
     // Extract education (look for education section)
     const educationKeywords = ['education', 'qualification', 'degree', 'university', 'college', 'laurea', 'diploma'];
     let educationSection = '';
-    const linesLower = text.toLowerCase().split('\n');
     
     for (let i = 0; i < linesLower.length; i++) {
       if (educationKeywords.some(keyword => linesLower[i].includes(keyword))) {
