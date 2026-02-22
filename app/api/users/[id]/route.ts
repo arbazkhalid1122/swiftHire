@@ -36,8 +36,10 @@ export async function GET(
         name: user.name,
         email: user.email,
         companyName: user.companyName,
+        companyLogoUrl: user.companyLogoUrl,
         userType: user.userType,
         location: user.location,
+        profilePhotoUrl: user.profilePhotoUrl,
       },
     }, { status: 200 });
   } catch (error: any) {
@@ -48,4 +50,3 @@ export async function GET(
     );
   }
 }
-

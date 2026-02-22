@@ -12,9 +12,12 @@ export default function CompanyDashboard() {
   const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'jobs' | 'messages' | 'publish'>('jobs');
+  const [activeTab, setActiveTab] = useState<'jobs' | 'messages' | 'publish' | 'courses'>('jobs');
   const [jobs, setJobs] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [companyLogoUrl, setCompanyLogoUrl] = useState('');
+  const [courses, setCourses] = useState<Array<{ title: string; description?: string; url?: string }>>([]);
+  const [courseForm, setCourseForm] = useState({ title: '', description: '', url: '' });
   const [showJobForm, setShowJobForm] = useState(false);
   const [jobForm, setJobForm] = useState({
     title: '',
@@ -117,6 +120,8 @@ export default function CompanyDashboard() {
         return;
       }
 
+      setCompanyLogoUrl(data.user.companyLogoUrl || '');
+      setCourses(data.user.companyCourses || []);
       setUser(data.user);
     } catch (error) {
       router.push('/');
@@ -171,6 +176,27 @@ export default function CompanyDashboard() {
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+    }
+  };
+
+  const saveCompanyExtras = async (payload: any) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error('Save failed');
+      }
+      await checkAuth();
+      showToast('Dati azienda aggiornati', 'success');
+    } catch (error) {
+      showToast('Errore durante il salvataggio', 'error');
     }
   };
 
@@ -275,6 +301,13 @@ export default function CompanyDashboard() {
           <p style={{ color: 'var(--text-secondary)' }}>
             Gestisci i tuoi annunci e messaggi
           </p>
+          {companyLogoUrl && (
+            <img
+              src={companyLogoUrl}
+              alt="Logo azienda"
+              style={{ width: '72px', height: '72px', objectFit: 'cover', borderRadius: '12px', marginTop: '0.75rem', border: '1px solid var(--border-light)' }}
+            />
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '2px solid var(--border-light)' }}>
@@ -307,6 +340,21 @@ export default function CompanyDashboard() {
             }}
           >
             Messaggi
+          </button>
+          <button
+            onClick={() => setActiveTab('courses')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: activeTab === 'courses' ? 'var(--primary)' : 'transparent',
+              color: activeTab === 'courses' ? 'white' : 'var(--text-primary)',
+              border: 'none',
+              borderBottom: activeTab === 'courses' ? '3px solid var(--primary)' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: '600',
+              transition: 'all 0.3s',
+            }}
+          >
+            Corsi
           </button>
           <button
             onClick={() => { setActiveTab('publish'); setShowJobForm(true); }}
@@ -464,6 +512,98 @@ export default function CompanyDashboard() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'courses' && (
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div className="card" style={{ padding: '1.25rem' }}>
+              <h3 style={{ marginBottom: '0.75rem' }}>Logo Azienda</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <input
+                  type="url"
+                  value={companyLogoUrl}
+                  onChange={(e) => setCompanyLogoUrl(e.target.value)}
+                  placeholder="https://...logo.png"
+                  style={{ flex: 1, minWidth: '250px', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                />
+                <button className="btn-submit" style={{ width: 'auto' }} onClick={() => saveCompanyExtras({ companyLogoUrl })}>
+                  Salva Logo
+                </button>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '1.25rem' }}>
+              <h3 style={{ marginBottom: '0.75rem' }}>Corsi Aziendali</h3>
+              <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1rem' }}>
+                <input
+                  type="text"
+                  value={courseForm.title}
+                  onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                  placeholder="Titolo corso"
+                  style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                />
+                <textarea
+                  value={courseForm.description}
+                  onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                  placeholder="Descrizione breve"
+                  rows={3}
+                  style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontFamily: 'inherit' }}
+                />
+                <input
+                  type="url"
+                  value={courseForm.url}
+                  onChange={(e) => setCourseForm({ ...courseForm, url: e.target.value })}
+                  placeholder="https://... (opzionale)"
+                  style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}
+                />
+                <button
+                  className="btn-submit"
+                  style={{ width: 'auto' }}
+                  onClick={() => {
+                    if (!courseForm.title.trim()) return;
+                    const updated = [...courses, { ...courseForm, title: courseForm.title.trim() }];
+                    setCourses(updated);
+                    setCourseForm({ title: '', description: '', url: '' });
+                    saveCompanyExtras({ companyCourses: updated });
+                  }}
+                >
+                  Aggiungi Corso
+                </button>
+              </div>
+
+              {courses.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)' }}>Nessun corso inserito.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                  {courses.map((course, index) => (
+                    <div key={`${course.title}-${index}`} style={{ padding: '0.9rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                        <div>
+                          <strong>{course.title}</strong>
+                          {course.description && <p style={{ margin: '0.4rem 0', color: 'var(--text-secondary)' }}>{course.description}</p>}
+                          {course.url && (
+                            <a href={course.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                              Apri corso
+                            </a>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            const updated = courses.filter((_, i) => i !== index);
+                            setCourses(updated);
+                            saveCompanyExtras({ companyCourses: updated });
+                          }}
+                          style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', background: 'transparent', cursor: 'pointer', height: 'fit-content' }}
+                        >
+                          Rimuovi
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -667,4 +807,3 @@ export default function CompanyDashboard() {
     </>
   );
 }
-

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '../components/Header';
 import { useToast } from '../contexts/ToastContext';
@@ -12,10 +12,14 @@ export default function CandidateDashboard() {
   const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'search' | 'cv' | 'video-cv' | 'applications' | 'messages'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'profile' | 'applications' | 'messages'>('search');
   const [jobs, setJobs] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
+  const [loadingMoreJobs, setLoadingMoreJobs] = useState(false);
+  const [distanceFilterEnabled, setDistanceFilterEnabled] = useState(false);
+  const [distanceKm, setDistanceKm] = useState(25);
+  const jobsLoadTriggerRef = useRef<HTMLDivElement | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [jobTypeFilter, setJobTypeFilter] = useState('');
@@ -49,6 +53,10 @@ export default function CandidateDashboard() {
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [isDraftVideoPlaying, setIsDraftVideoPlaying] = useState(false);
+  const [isSavedVideoPlaying, setIsSavedVideoPlaying] = useState(false);
+  const draftVideoRef = useRef<HTMLVideoElement | null>(null);
+  const savedVideoRef = useRef<HTMLVideoElement | null>(null);
   const [teleprompterText, setTeleprompterText] = useState('Inizia a parlare della tua esperienza in ambito professionale... focalizzati sulle tue soft skills e sui risultati raggiunti negli ultimi anni.');
   const [teleprompterPosition, setTeleprompterPosition] = useState(150);
   const [teleprompterInterval, setTeleprompterInterval] = useState<NodeJS.Timeout | null>(null);
@@ -60,6 +68,36 @@ export default function CandidateDashboard() {
     isCurrent: false,
     description: '',
   });
+  const [cvProfileForm, setCvProfileForm] = useState({
+    headline: '',
+    summary: '',
+    desiredRole: '',
+    dateOfBirth: '',
+    nationality: '',
+    linkedinUrl: '',
+    portfolioUrl: '',
+    githubUrl: '',
+    expectedSalary: '',
+    availability: '',
+    preferredWorkMode: '',
+    strengthsText: '',
+    achievementsText: '',
+    projects: [] as Array<{
+      name?: string;
+      role?: string;
+      description?: string;
+      technologies?: string;
+      link?: string;
+    }>,
+  });
+  const [projectForm, setProjectForm] = useState({
+    name: '',
+    role: '',
+    description: '',
+    technologies: '',
+    link: '',
+  });
+  const [savingCvProfile, setSavingCvProfile] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -69,15 +107,16 @@ export default function CandidateDashboard() {
     if (user) {
       if (activeTab === 'search') {
         fetchJobs();
-      } else if (activeTab === 'cv') {
+      } else if (activeTab === 'profile') {
         fetchExperience();
       } else if (activeTab === 'applications') {
         fetchApplications();
       } else if (activeTab === 'messages') {
         fetchMessages();
+        fetchApplications();
       }
     }
-  }, [user, activeTab, searchQuery, locationFilter, jobTypeFilter]);
+  }, [user, activeTab, searchQuery, locationFilter, jobTypeFilter, distanceFilterEnabled, distanceKm]);
 
   // Listen for real-time message updates
   useEffect(() => {
@@ -160,6 +199,22 @@ export default function CandidateDashboard() {
       setUserCertifications(data.user.certifications || []);
       setUserEducation(data.user.educationHistory || []);
       setYearsOfExperience(data.user.calculatedExperience?.toString() || '');
+      setCvProfileForm({
+        headline: data.user.cvProfile?.headline || '',
+        summary: data.user.cvProfile?.summary || '',
+        desiredRole: data.user.cvProfile?.desiredRole || '',
+        dateOfBirth: data.user.cvProfile?.dateOfBirth || '',
+        nationality: data.user.cvProfile?.nationality || '',
+        linkedinUrl: data.user.cvProfile?.linkedinUrl || '',
+        portfolioUrl: data.user.cvProfile?.portfolioUrl || '',
+        githubUrl: data.user.cvProfile?.githubUrl || '',
+        expectedSalary: data.user.cvProfile?.expectedSalary || '',
+        availability: data.user.cvProfile?.availability || '',
+        preferredWorkMode: data.user.cvProfile?.preferredWorkMode || '',
+        strengthsText: (data.user.cvProfile?.strengths || []).join('\n'),
+        achievementsText: (data.user.cvProfile?.achievements || []).join('\n'),
+        projects: data.user.cvProfile?.projects || [],
+      });
     } catch (error) {
       router.push('/');
     } finally {
@@ -167,13 +222,21 @@ export default function CandidateDashboard() {
     }
   };
 
-  const fetchJobs = async (page: number = 1) => {
+  const fetchJobs = async (page: number = 1, append: boolean = false) => {
     try {
+      if (append) {
+        setLoadingMoreJobs(true);
+      }
       const token = localStorage.getItem('token');
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      if (locationFilter) params.append('location', locationFilter);
+      // When distance filter is on, use profile location as origin; otherwise use location search
+      const locationForRequest = distanceFilterEnabled && user?.location
+        ? user.location
+        : locationFilter;
+      if (locationForRequest) params.append('location', locationForRequest);
       if (jobTypeFilter) params.append('jobType', jobTypeFilter);
+      if (distanceFilterEnabled) params.append('distanceKm', distanceKm.toString());
       params.append('page', page.toString());
       params.append('limit', '12');
 
@@ -183,14 +246,34 @@ export default function CandidateDashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        setJobs(data.jobs || []);
+        setJobs((prev) => append ? [...prev, ...(data.jobs || [])] : (data.jobs || []));
         setPagination(data.pagination);
         setCurrentPage(page);
       }
     } catch (error) {
       console.error('Error fetching jobs:', error);
+    } finally {
+      setLoadingMoreJobs(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab !== 'search') return;
+    const node = jobsLoadTriggerRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+      if (!entry?.isIntersecting) return;
+      if (loadingMoreJobs) return;
+      if (pagination?.hasNextPage) {
+        fetchJobs(currentPage + 1, true);
+      }
+    }, { threshold: 0.3 });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [activeTab, pagination, currentPage, loadingMoreJobs]);
 
   const fetchExperience = async () => {
     try {
@@ -311,6 +394,7 @@ export default function CandidateDashboard() {
         const blob = new Blob(chunks, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
         setVideoUrl(url);
+        setIsDraftVideoPlaying(false);
         setRecordedChunks(chunks);
       };
 
@@ -390,6 +474,8 @@ export default function CandidateDashboard() {
       // Clean up
       URL.revokeObjectURL(videoUrl);
       setVideoUrl(null);
+      setIsDraftVideoPlaying(false);
+      setIsSavedVideoPlaying(false);
       setRecordedChunks([]);
       
       // Refresh user data
@@ -740,6 +826,204 @@ export default function CandidateDashboard() {
     }
   };
 
+  const handleAddProjectToCv = () => {
+    if (!projectForm.name.trim()) {
+      showToast('Inserisci almeno il nome progetto', 'error');
+      return;
+    }
+
+    setCvProfileForm((prev) => ({
+      ...prev,
+      projects: [...prev.projects, {
+        name: projectForm.name.trim(),
+        role: projectForm.role.trim(),
+        description: projectForm.description.trim(),
+        technologies: projectForm.technologies.trim(),
+        link: projectForm.link.trim(),
+      }],
+    }));
+    setProjectForm({ name: '', role: '', description: '', technologies: '', link: '' });
+  };
+
+  const handleRemoveProjectFromCv = (index: number) => {
+    setCvProfileForm((prev) => ({
+      ...prev,
+      projects: prev.projects.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSaveCvProfile = async () => {
+    setSavingCvProfile(true);
+    try {
+      const token = localStorage.getItem('token');
+      const cvProfile = {
+        headline: cvProfileForm.headline.trim(),
+        summary: cvProfileForm.summary.trim(),
+        desiredRole: cvProfileForm.desiredRole.trim(),
+        dateOfBirth: cvProfileForm.dateOfBirth,
+        nationality: cvProfileForm.nationality.trim(),
+        linkedinUrl: cvProfileForm.linkedinUrl.trim(),
+        portfolioUrl: cvProfileForm.portfolioUrl.trim(),
+        githubUrl: cvProfileForm.githubUrl.trim(),
+        expectedSalary: cvProfileForm.expectedSalary.trim(),
+        availability: cvProfileForm.availability.trim(),
+        preferredWorkMode: cvProfileForm.preferredWorkMode,
+        strengths: cvProfileForm.strengthsText.split('\n').map(s => s.trim()).filter(Boolean),
+        achievements: cvProfileForm.achievementsText.split('\n').map(s => s.trim()).filter(Boolean),
+        projects: cvProfileForm.projects,
+      };
+
+      const response = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ cvProfile }),
+      });
+
+      if (!response.ok) {
+        showToast('Errore nel salvataggio CV', 'error');
+        return;
+      }
+
+      showToast('CV Builder salvato con successo!', 'success');
+      checkAuth();
+    } catch (error) {
+      showToast('Errore di rete', 'error');
+    } finally {
+      setSavingCvProfile(false);
+    }
+  };
+
+  const handleGenerateDetailedCvPdf = () => {
+    const jsPDFConstructor = (window as any)?.jspdf?.jsPDF;
+    if (!jsPDFConstructor) {
+      showToast('Motore PDF non disponibile. Ricarica la pagina.', 'error');
+      return;
+    }
+
+    const doc = new jsPDFConstructor('p', 'mm', 'a4');
+    const pageWidth = 210;
+    const margin = 14;
+    let y = 18;
+
+    const line = (text: string, size = 10, color: [number, number, number] = [45, 55, 72], bold = false) => {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+      const lines = doc.splitTextToSize(text || '', pageWidth - margin * 2);
+      doc.text(lines, margin, y);
+      y += lines.length * (size * 0.42) + 2;
+    };
+
+    const section = (title: string) => {
+      y += 2;
+      doc.setDrawColor(128, 0, 0);
+      doc.setLineWidth(0.7);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 5;
+      line(title, 12, [128, 0, 0], true);
+    };
+
+    const ensureSpace = (space = 22) => {
+      if (y > 280 - space) {
+        doc.addPage();
+        y = 18;
+      }
+    };
+
+    line(user?.name || 'Candidate', 21, [18, 23, 38], true);
+    line(cvProfileForm.headline || cvProfileForm.desiredRole || 'Professional Profile', 12, [128, 0, 0], true);
+    line(
+      [user?.email, user?.phone, user?.location].filter(Boolean).join('  |  '),
+      10,
+      [71, 85, 105]
+    );
+    line(
+      [cvProfileForm.linkedinUrl, cvProfileForm.portfolioUrl, cvProfileForm.githubUrl].filter(Boolean).join('  |  '),
+      9,
+      [71, 85, 105]
+    );
+
+    ensureSpace();
+    section('Professional Summary');
+    line(cvProfileForm.summary || user?.bio || 'No summary provided.');
+
+    ensureSpace();
+    section('Core Information');
+    line(`Desired Role: ${cvProfileForm.desiredRole || '-'}`, 10);
+    line(`Availability: ${cvProfileForm.availability || '-'}`, 10);
+    line(`Preferred Work Mode: ${cvProfileForm.preferredWorkMode || '-'}`, 10);
+    line(`Expected Salary: ${cvProfileForm.expectedSalary || '-'}`, 10);
+    line(`Nationality: ${cvProfileForm.nationality || '-'}`, 10);
+    line(`Date of Birth: ${cvProfileForm.dateOfBirth || '-'}`, 10);
+
+    ensureSpace();
+    section('Skills');
+    line((userSkills.length > 0 ? userSkills : ['No skills listed']).join(' • '), 10);
+
+    if (cvProfileForm.strengthsText.trim()) {
+      ensureSpace();
+      section('Strengths');
+      cvProfileForm.strengthsText.split('\n').map(s => s.trim()).filter(Boolean).forEach((s) => line(`• ${s}`, 10));
+    }
+
+    if (experiences.length > 0) {
+      ensureSpace();
+      section('Professional Experience');
+      experiences.forEach((exp: any) => {
+        ensureSpace(30);
+        line(`${exp.position || '-'} - ${exp.companyName || '-'}`, 11, [18, 23, 38], true);
+        line(`${new Date(exp.startDate).toLocaleDateString('it-IT')} - ${exp.isCurrent ? 'Present' : new Date(exp.endDate).toLocaleDateString('it-IT')}`, 9, [71, 85, 105]);
+        if (exp.description) line(exp.description, 10);
+      });
+    }
+
+    if (userEducation.length > 0) {
+      ensureSpace();
+      section('Education');
+      userEducation.forEach((edu: any) => {
+        ensureSpace(20);
+        line(`${edu.degree || '-'} - ${edu.institution || '-'}`, 10, [18, 23, 38], true);
+        line(`${edu.field || ''} ${edu.startDate ? `(${new Date(edu.startDate).getFullYear()}` : ''}${edu.endDate ? ` - ${new Date(edu.endDate).getFullYear()})` : edu.startDate ? ')' : ''}`, 9, [71, 85, 105]);
+      });
+    }
+
+    if (cvProfileForm.projects.length > 0) {
+      ensureSpace();
+      section('Projects');
+      cvProfileForm.projects.forEach((p) => {
+        ensureSpace(28);
+        line(`${p.name || '-'}${p.role ? ` - ${p.role}` : ''}`, 10, [18, 23, 38], true);
+        if (p.technologies) line(`Tech: ${p.technologies}`, 9, [71, 85, 105]);
+        if (p.description) line(p.description, 10);
+        if (p.link) line(p.link, 9, [0, 102, 204]);
+      });
+    }
+
+    if (cvProfileForm.achievementsText.trim()) {
+      ensureSpace();
+      section('Achievements');
+      cvProfileForm.achievementsText.split('\n').map(s => s.trim()).filter(Boolean).forEach((s) => line(`• ${s}`, 10));
+    }
+
+    if (userLanguages.length > 0) {
+      ensureSpace();
+      section('Languages');
+      userLanguages.forEach((lang) => line(`${lang.name}: ${lang.level}`, 10));
+    }
+
+    if (userCertifications.length > 0) {
+      ensureSpace();
+      section('Certifications');
+      userCertifications.forEach((cert) => line(`${cert.name}${cert.date ? ` (${cert.date})` : ''}`, 10));
+    }
+
+    doc.save(`CV_${(user?.name || 'candidate').replace(/\s+/g, '_')}.pdf`);
+    showToast('CV PDF generato con successo!', 'success');
+  };
+
   if (loading && !user) {
     return (
       <>
@@ -932,92 +1216,41 @@ export default function CandidateDashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '2px solid var(--border-light)' }}>
-          <button
-            onClick={() => setActiveTab('search')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'search' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'search' ? 'white' : 'var(--text-primary)',
-              border: 'none',
-              borderBottom: activeTab === 'search' ? '3px solid var(--primary)' : '3px solid transparent',
-              cursor: 'pointer',
-              fontWeight: '600',
-              transition: 'all 0.3s',
-            }}
-          >
-            <i className="fas fa-search" style={{ marginRight: '0.5rem' }}></i>
-            Cerca Lavoro
-          </button>
-          <button
-            onClick={() => setActiveTab('cv')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'cv' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'cv' ? 'white' : 'var(--text-primary)',
-              border: 'none',
-              borderBottom: activeTab === 'cv' ? '3px solid var(--primary)' : '3px solid transparent',
-              cursor: 'pointer',
-              fontWeight: '600',
-              transition: 'all 0.3s',
-            }}
-          >
-            <i className="fas fa-file-alt" style={{ marginRight: '0.5rem' }}></i>
-            Il Mio CV
-          </button>
-          <button
-            onClick={() => setActiveTab('video-cv')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'video-cv' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'video-cv' ? 'white' : 'var(--text-primary)',
-              border: 'none',
-              borderBottom: activeTab === 'video-cv' ? '3px solid var(--primary)' : '3px solid transparent',
-              cursor: 'pointer',
-              fontWeight: '600',
-              transition: 'all 0.3s',
-            }}
-          >
-            <i className="fas fa-user-edit" style={{ marginRight: '0.5rem' }}></i>
-            Il Mio Profilo
-          </button>
-          <button
-            onClick={() => setActiveTab('applications')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'applications' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'applications' ? 'white' : 'var(--text-primary)',
-              border: 'none',
-              borderBottom: activeTab === 'applications' ? '3px solid var(--primary)' : '3px solid transparent',
-              cursor: 'pointer',
-              fontWeight: '600',
-              transition: 'all 0.3s',
-            }}
-          >
-            <i className="fas fa-file-alt" style={{ marginRight: '0.5rem' }}></i>
-            Le Mie Candidature
-          </button>
-          <button
-            onClick={() => setActiveTab('messages')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: activeTab === 'messages' ? 'var(--primary)' : 'transparent',
-              color: activeTab === 'messages' ? 'white' : 'var(--text-primary)',
-              border: 'none',
-              borderBottom: activeTab === 'messages' ? '3px solid var(--primary)' : '3px solid transparent',
-              cursor: 'pointer',
-              fontWeight: '600',
-              transition: 'all 0.3s',
-            }}
-          >
-            <i className="fas fa-envelope" style={{ marginRight: '0.5rem' }}></i>
-            Messaggi
-          </button>
-        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '230px 1fr', gap: '1rem', alignItems: 'start' }}>
+          <aside style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '0.75rem', position: 'sticky', top: '1rem' }}>
+            {[
+              { key: 'search', icon: 'fa-search', label: 'Cerca Lavoro' },
+              { key: 'profile', icon: 'fa-user', label: 'Profilo' },
+              { key: 'applications', icon: 'fa-file-alt', label: 'Candidature' },
+              { key: 'messages', icon: 'fa-envelope', label: 'Messaggi' },
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key as 'search' | 'profile' | 'applications' | 'messages')}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '0.8rem 0.9rem',
+                  marginBottom: '0.5rem',
+                  background: activeTab === item.key ? 'var(--primary)' : 'transparent',
+                  color: activeTab === item.key ? 'white' : 'var(--text-primary)',
+                  border: '1px solid ' + (activeTab === item.key ? 'var(--primary)' : 'var(--border-light)'),
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                <i className={`fas ${item.icon}`} style={{ marginRight: '0.5rem' }}></i>
+                {item.label}
+              </button>
+            ))}
+          </aside>
+
+          <div>
 
         {activeTab === 'search' && (
           <div>
-            <div style={{ marginBottom: '2rem', padding: '0.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '2px solid rgba(128,0,0,0.2)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
                 <input
                   type="text"
@@ -1045,12 +1278,37 @@ export default function CandidateDashboard() {
                   <option value="internship">Stage</option>
                 </select>
                 <button
-                  onClick={() => fetchJobs(1)}
+                  onClick={() => fetchJobs(1, false)}
                   className="btn-submit"
                   style={{ whiteSpace: 'nowrap', width: 'auto', minWidth: 'fit-content', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 0, padding: '1rem' }}
                 >
                   <i className="fas fa-search"></i>
                 </button>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={distanceFilterEnabled}
+                    onChange={(e) => setDistanceFilterEnabled(e.target.checked)}
+                  />
+                  Filtro distanza
+                </label>
+                <input
+                  type="range"
+                  min={5}
+                  max={100}
+                  step={5}
+                  value={distanceKm}
+                  disabled={!distanceFilterEnabled}
+                  onChange={(e) => setDistanceKm(parseInt(e.target.value))}
+                />
+                <span style={{ fontWeight: 600 }}>{distanceKm} km</span>
+                {distanceFilterEnabled && !user?.location && (
+                  <span style={{ fontSize: '0.875rem', color: 'var(--warning)' }}>
+                    Imposta la località nel <a href="/profile" style={{ color: 'var(--primary)' }}>profilo</a> per filtrare per distanza.
+                  </span>
+                )}
               </div>
               {totalExperience > 0 && (
                 <div style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem' }}>
@@ -1070,12 +1328,21 @@ export default function CandidateDashboard() {
                 {jobs.map((job: any) => (
                   <div key={job._id} style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                      <div>
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        {(job.companyId?.companyLogoUrl || job.companyId?.profilePhotoUrl) && (
+                          <img
+                            src={job.companyId?.companyLogoUrl || job.companyId?.profilePhotoUrl}
+                            alt={job.companyId?.companyName || job.companyId?.name || 'Company'}
+                            style={{ width: '48px', height: '48px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--border-light)' }}
+                          />
+                        )}
+                        <div>
                         <h3 style={{ marginBottom: '0.5rem', color: 'var(--primary)' }}>{job.title}</h3>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                           {job.companyId?.companyName || job.companyId?.name}
                         </p>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{job.description.substring(0, 200)}...</p>
+                        </div>
                       </div>
                       {job.matchScore !== undefined && (
                         <span style={{
@@ -1139,59 +1406,28 @@ export default function CandidateDashboard() {
                       >
                         Candidati
                       </button>
+                      <button
+                        onClick={() => router.push(`/messages/${job.companyId?._id}?jobId=${job._id}`)}
+                        style={{
+                          minWidth: 'fit-content',
+                          padding: '1rem',
+                          background: 'var(--bg-secondary)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: 'var(--radius-md)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <i className="fas fa-envelope"></i>
+                      </button>
                     </div>
                   </div>
                 ))}
                 
-                {/* Pagination Controls */}
-                {pagination && pagination.totalPages > 1 && (
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center', 
-                    gap: '0.5rem', 
-                    marginTop: '2rem',
-                    flexWrap: 'wrap'
-                  }}>
-                    <button
-                      onClick={() => fetchJobs(currentPage - 1)}
-                      disabled={!pagination.hasPrevPage}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: pagination.hasPrevPage ? 'var(--primary)' : 'var(--bg-secondary)',
-                        color: pagination.hasPrevPage ? 'white' : 'var(--text-secondary)',
-                        border: 'none',
-                        borderRadius: 'var(--radius-md)',
-                        cursor: pagination.hasPrevPage ? 'pointer' : 'not-allowed',
-                        opacity: pagination.hasPrevPage ? 1 : 0.5,
-                      }}
-                    >
-                      <i className="fas fa-chevron-left"></i> Precedente
-                    </button>
-                    
-                    <span style={{ 
-                      padding: '0.5rem 1rem',
-                      color: 'var(--text-primary)',
-                      fontWeight: '600'
-                    }}>
-                      Pagina {pagination.page} di {pagination.totalPages}
-                    </span>
-                    
-                    <button
-                      onClick={() => fetchJobs(currentPage + 1)}
-                      disabled={!pagination.hasNextPage}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: pagination.hasNextPage ? 'var(--primary)' : 'var(--bg-secondary)',
-                        color: pagination.hasNextPage ? 'white' : 'var(--text-secondary)',
-                        border: 'none',
-                        borderRadius: 'var(--radius-md)',
-                        cursor: pagination.hasNextPage ? 'pointer' : 'not-allowed',
-                        opacity: pagination.hasNextPage ? 1 : 0.5,
-                      }}
-                    >
-                      Successiva <i className="fas fa-chevron-right"></i>
-                    </button>
+                <div ref={jobsLoadTriggerRef} style={{ height: '20px' }} />
+                {loadingMoreJobs && (
+                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '1rem 0' }}>
+                    Caricamento altre offerte...
                   </div>
                 )}
               </div>
@@ -1199,44 +1435,310 @@ export default function CandidateDashboard() {
           </div>
         )}
 
-        {activeTab === 'cv' && (
-          <div>
-            <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 style={{ marginBottom: '0.5rem' }}>Esperienza Lavorativa</h2>
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  Esperienza totale calcolata: <strong>{totalExperience.toFixed(1)} anni</strong>
-                  <i className="fas fa-info-circle" style={{ marginLeft: '0.5rem', fontSize: '0.875rem' }} title="Esperienza calcolata su periodi solari effettivi"></i>
-                </p>
+        {activeTab === 'profile' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Single profile: summary + video CV + CV + experience */}
+            <div className="card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+              {user?.profilePhotoUrl ? (
+                <img
+                  src={user.profilePhotoUrl}
+                  alt=""
+                  style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border-light)' }}
+                />
+              ) : (
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '2rem', fontWeight: 600 }}>
+                  {user?.name?.charAt(0).toUpperCase() || '?'}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: '200px' }}>
+                <h2 style={{ marginBottom: '0.25rem' }}>{user?.name || 'Profilo'}</h2>
+                {user?.location && <p style={{ color: 'var(--text-secondary)', margin: 0 }}><i className="fas fa-map-marker-alt" style={{ marginRight: '0.5rem' }}></i>{user.location}</p>}
+                <a href="/profile" style={{ marginTop: '0.5rem', display: 'inline-block', color: 'var(--primary)', fontSize: '0.875rem' }}>Modifica profilo</a>
               </div>
-              <button
-                onClick={() => setShowExperienceForm(true)}
-                className="btn-submit"
-              >
-                <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i>
-                Aggiungi Esperienza
-              </button>
             </div>
 
-            {experiences.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
-                <i className="fas fa-briefcase" style={{ fontSize: '3rem', color: 'var(--text-tertiary)', marginBottom: '1rem' }}></i>
-                <p style={{ color: 'var(--text-secondary)' }}>Nessuna esperienza aggiunta</p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                {experiences.map((exp: any) => (
-                  <div key={exp._id} style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-                    <h3 style={{ marginBottom: '0.5rem' }}>{exp.position}</h3>
-                    <p style={{ color: 'var(--primary)', marginBottom: '0.5rem', fontWeight: '600' }}>{exp.companyName}</p>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                      {new Date(exp.startDate).toLocaleDateString('it-IT')} - {exp.isCurrent ? 'Presente' : new Date(exp.endDate).toLocaleDateString('it-IT')}
-                    </p>
-                    {exp.description && <p style={{ color: 'var(--text-secondary)' }}>{exp.description}</p>}
+            {/* Video CV at top - wide, no controls, big play button */}
+            {(user?.videoCvUrl || videoUrl) && (
+              <div className="card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>
+                  <i className="fas fa-video" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
+                  {user?.videoCvUrl && !videoUrl ? 'Il Mio Video CV' : 'Video CV Registrato'}
+                </h3>
+                <div style={{ 
+                  width: '100%', 
+                  maxWidth: '1200px', 
+                  margin: '0 auto',
+                  background: '#000',
+                  borderRadius: 'var(--radius-lg)',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  aspectRatio: '16/9'
+                }}>
+                  <video
+                    ref={videoUrl ? draftVideoRef : savedVideoRef}
+                    src={videoUrl || user?.videoCvUrl || ''}
+                    controls={false}
+                    onEnded={() => { if (videoUrl) setIsDraftVideoPlaying(false); else setIsSavedVideoPlaying(false); }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'block',
+                      objectFit: 'cover',
+                      objectPosition: 'top',
+                    }}
+                  />
+                  {(!videoUrl && !isSavedVideoPlaying) || (videoUrl && !isDraftVideoPlaying) ? (
+                    <button
+                      onClick={() => {
+                        const ref = videoUrl ? draftVideoRef : savedVideoRef;
+                        ref.current?.play();
+                        if (videoUrl) setIsDraftVideoPlaying(true); else setIsSavedVideoPlaying(true);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '120px',
+                        height: '120px',
+                        borderRadius: '50%',
+                        border: 'none',
+                        background: 'rgba(128,0,0,0.9)',
+                        color: 'white',
+                        fontSize: '3rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+                      }}
+                      aria-label="Play video"
+                    >
+                      <i className="fas fa-play" style={{ marginLeft: '8px' }}></i>
+                    </button>
+                  ) : null}
+                </div>
+                {videoUrl && !isRecording && (
+                  <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '1rem' }}>
+                    <button onClick={() => { setVideoUrl(null); setIsDraftVideoPlaying(false); setRecordedChunks([]); }} className="btn-submit" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                      <i className="fas fa-redo" style={{ marginRight: '0.5rem' }}></i> Registra Nuovo Video
+                    </button>
+                    <button onClick={saveVideoCV} className="btn-submit" disabled={uploadingVideo}>
+                      {uploadingVideo ? <><i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i> Salvataggio...</> : <><i className="fas fa-save" style={{ marginRight: '0.5rem' }}></i> Salva Video CV</>}
+                    </button>
                   </div>
-                ))}
+                )}
+                {user?.videoCvUrl && !videoUrl && (
+                  <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
+                    <a href={user.videoCvUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontSize: '0.875rem' }}>
+                      <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i> Apri in nuova scheda
+                    </a>
+                  </div>
+                )}
               </div>
             )}
+
+            {/* CV Builder */}
+            <div className="card" style={{ padding: '1.5rem', border: '1px solid rgba(128,0,0,0.25)', background: 'linear-gradient(180deg, #fff, #fff9f8)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ marginBottom: '0.35rem', color: 'var(--primary)' }}>
+                    <i className="fas fa-file-signature" style={{ marginRight: '0.5rem' }}></i>
+                    CV Builder Professionale
+                  </h3>
+                  <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
+                    Compila i campi per creare un CV dettagliato, moderno e pronto in PDF.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button onClick={handleSaveCvProfile} className="btn-submit" disabled={savingCvProfile} style={{ width: 'auto' }}>
+                    {savingCvProfile ? 'Salvataggio...' : <><i className="fas fa-save" style={{ marginRight: '0.5rem' }}></i> Salva CV</>}
+                  </button>
+                  <button onClick={handleGenerateDetailedCvPdf} className="btn-submit" style={{ width: 'auto', background: '#0f172a' }}>
+                    <i className="fas fa-file-pdf" style={{ marginRight: '0.5rem' }}></i>
+                    Genera PDF
+                  </button>
+                </div>
+              </div>
+
+              {user?.cvUrl && (
+                <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: 'rgba(15,23,42,0.05)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
+                  <a href={user.cvUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>
+                    <i className="fas fa-link" style={{ marginRight: '0.5rem' }}></i>
+                    CV caricato attuale: apri file PDF
+                  </a>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', marginBottom: '0.85rem' }}>
+                <input value={cvProfileForm.headline} onChange={(e) => setCvProfileForm({ ...cvProfileForm, headline: e.target.value })} placeholder="Titolo professionale (es. Senior Frontend Engineer)" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <input value={cvProfileForm.desiredRole} onChange={(e) => setCvProfileForm({ ...cvProfileForm, desiredRole: e.target.value })} placeholder="Ruolo desiderato" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <input type="date" value={cvProfileForm.dateOfBirth} onChange={(e) => setCvProfileForm({ ...cvProfileForm, dateOfBirth: e.target.value })} style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <input value={cvProfileForm.nationality} onChange={(e) => setCvProfileForm({ ...cvProfileForm, nationality: e.target.value })} placeholder="Nazionalità" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <input value={cvProfileForm.availability} onChange={(e) => setCvProfileForm({ ...cvProfileForm, availability: e.target.value })} placeholder="Disponibilità (es. Immediata / 30 giorni)" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <input value={cvProfileForm.expectedSalary} onChange={(e) => setCvProfileForm({ ...cvProfileForm, expectedSalary: e.target.value })} placeholder="RAL desiderata" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <select value={cvProfileForm.preferredWorkMode} onChange={(e) => setCvProfileForm({ ...cvProfileForm, preferredWorkMode: e.target.value })} style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }}>
+                  <option value="">Modalità lavoro preferita</option>
+                  <option value="Remote">Remote</option>
+                  <option value="Hybrid">Hybrid</option>
+                  <option value="On-site">On-site</option>
+                </select>
+                <input value={cvProfileForm.linkedinUrl} onChange={(e) => setCvProfileForm({ ...cvProfileForm, linkedinUrl: e.target.value })} placeholder="LinkedIn URL" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <input value={cvProfileForm.portfolioUrl} onChange={(e) => setCvProfileForm({ ...cvProfileForm, portfolioUrl: e.target.value })} placeholder="Portfolio URL" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                <input value={cvProfileForm.githubUrl} onChange={(e) => setCvProfileForm({ ...cvProfileForm, githubUrl: e.target.value })} placeholder="GitHub URL" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+              </div>
+
+              <textarea
+                value={cvProfileForm.summary}
+                onChange={(e) => setCvProfileForm({ ...cvProfileForm, summary: e.target.value })}
+                placeholder="Profilo professionale (3-5 righe): specializzazione, valore che porti, obiettivi."
+                rows={4}
+                style={{ width: '100%', marginBottom: '0.85rem', padding: '0.85rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontFamily: 'inherit' }}
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '0.85rem' }}>
+                <textarea
+                  value={cvProfileForm.strengthsText}
+                  onChange={(e) => setCvProfileForm({ ...cvProfileForm, strengthsText: e.target.value })}
+                  placeholder={'Punti di forza (uno per riga)\nEs: Leadership tecnica\nMentoring team\nProblem solving'}
+                  rows={5}
+                  style={{ width: '100%', padding: '0.85rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontFamily: 'inherit' }}
+                />
+                <textarea
+                  value={cvProfileForm.achievementsText}
+                  onChange={(e) => setCvProfileForm({ ...cvProfileForm, achievementsText: e.target.value })}
+                  placeholder={'Risultati misurabili (uno per riga)\nEs: Ridotto i tempi di rilascio del 35%\nAumentato conversioni del 22%'}
+                  rows={5}
+                  style={{ width: '100%', padding: '0.85rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              <div style={{ padding: '1rem', border: '1px dashed var(--border-light)', borderRadius: 'var(--radius-md)', marginBottom: '0.85rem' }}>
+                <h4 style={{ marginBottom: '0.75rem', color: 'var(--primary)' }}>Progetti da inserire nel CV</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <input value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} placeholder="Nome progetto" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                  <input value={projectForm.role} onChange={(e) => setProjectForm({ ...projectForm, role: e.target.value })} placeholder="Ruolo nel progetto" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                  <input value={projectForm.technologies} onChange={(e) => setProjectForm({ ...projectForm, technologies: e.target.value })} placeholder="Tecnologie usate" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                  <input value={projectForm.link} onChange={(e) => setProjectForm({ ...projectForm, link: e.target.value })} placeholder="Link progetto (opzionale)" style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' }} />
+                </div>
+                <textarea value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} placeholder="Descrizione progetto e impatto" rows={3} style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontFamily: 'inherit', marginBottom: '0.75rem' }} />
+                <button onClick={handleAddProjectToCv} className="btn-submit" style={{ width: 'auto' }}>
+                  <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i>
+                  Aggiungi Progetto
+                </button>
+
+                {cvProfileForm.projects.length > 0 && (
+                  <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.85rem' }}>
+                    {cvProfileForm.projects.map((project, index) => (
+                      <div key={`${project.name}-${index}`} style={{ padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+                          <div>
+                            <strong>{project.name}</strong> {project.role ? `• ${project.role}` : ''}
+                            {project.technologies && <p style={{ margin: '0.35rem 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{project.technologies}</p>}
+                            {project.description && <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{project.description}</p>}
+                          </div>
+                          <button onClick={() => handleRemoveProjectFromCv(index)} style={{ border: '1px solid var(--border-light)', background: 'transparent', borderRadius: 'var(--radius-md)', cursor: 'pointer', height: 'fit-content' }}>
+                            Rimuovi
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Work experience */}
+            <div>
+              <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div>
+                  <h2 style={{ marginBottom: '0.5rem' }}>Esperienza Lavorativa</h2>
+                  <p style={{ color: 'var(--text-secondary)' }}>
+                    Esperienza totale: <strong>{totalExperience.toFixed(1)} anni</strong>
+                    <i className="fas fa-info-circle" style={{ marginLeft: '0.5rem', fontSize: '0.875rem' }} title="Calcolata su periodi solari"></i>
+                  </p>
+                </div>
+                <button onClick={() => setShowExperienceForm(true)} className="btn-submit">
+                  <i className="fas fa-plus" style={{ marginRight: '0.5rem' }}></i> Aggiungi Esperienza
+                </button>
+              </div>
+              {experiences.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
+                  <i className="fas fa-briefcase" style={{ fontSize: '2.5rem', color: 'var(--text-tertiary)', marginBottom: '0.75rem' }}></i>
+                  <p style={{ color: 'var(--text-secondary)' }}>Nessuna esperienza aggiunta</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {experiences.map((exp: any) => (
+                    <div key={exp._id} style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
+                      <h3 style={{ marginBottom: '0.5rem' }}>{exp.position}</h3>
+                      <p style={{ color: 'var(--primary)', marginBottom: '0.5rem', fontWeight: '600' }}>{exp.companyName}</p>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                        {new Date(exp.startDate).toLocaleDateString('it-IT')} - {exp.isCurrent ? 'Presente' : new Date(exp.endDate).toLocaleDateString('it-IT')}
+                      </p>
+                      {exp.description && <p style={{ color: 'var(--text-secondary)' }}>{exp.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Record / update Video CV - optional teleprompter */}
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginBottom: '0.5rem', color: 'var(--primary)' }}>
+                <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i>
+                Registra o aggiorna Video CV
+              </h3>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                Il teleprompter è opzionale: puoi registrare senza testo a scorrimento.
+              </p>
+
+            {!isRecording && !videoUrl && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.875rem' }}>Testo Teleprompter (opzionale)</label>
+                <textarea
+                  value={teleprompterText}
+                  onChange={(e) => setTeleprompterText(e.target.value)}
+                  placeholder="Scrivi qui il testo che scorrerà durante la registrazione, oppure lascia vuoto."
+                  rows={3}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+                <button onClick={startVideoRecording} className="btn-submit" style={{ marginTop: '1rem', padding: '0.875rem 1.5rem' }}>
+                  <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i> Inizia Registrazione Video CV
+                </button>
+              </div>
+            )}
+
+            {isRecording && (
+              <div>
+                <h4 style={{ textAlign: 'center', marginBottom: '1rem', color: 'var(--primary)' }}>
+                  <i className="fas fa-circle" style={{ color: 'var(--error)', marginRight: '0.5rem', animation: 'pulse 1s infinite' }}></i>
+                  Registrazione in Corso
+                </h4>
+                <div style={{ position: 'relative', width: '100%', maxWidth: '1200px', margin: '0 auto', background: '#000', borderRadius: 'var(--radius-lg)', overflow: 'hidden', aspectRatio: '16/9' }}>
+                  {teleprompterText && (
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '120px', background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '16px', overflow: 'hidden', pointerEvents: 'none', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div id="teleprompter-text" style={{ fontSize: '1.25rem', fontWeight: '600', textAlign: 'center', transform: `translateY(${teleprompterPosition}px)`, whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                        {teleprompterText}
+                      </div>
+                    </div>
+                  )}
+                  <video
+                    id="video-preview"
+                    autoPlay
+                    muted
+                    playsInline
+                    style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover', objectPosition: 'top', borderRadius: 'var(--radius-lg)' }}
+                  />
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                  <button onClick={stopVideoRecording} className="btn-submit" style={{ padding: '1rem 2rem', background: 'var(--error)' }}>
+                    <i className="fas fa-stop" style={{ marginRight: '0.5rem' }}></i> Termina Registrazione
+                  </button>
+                </div>
+              </div>
+            )}
+            </div>
 
             {showExperienceForm && (
               <div className="modal-overlay active" onClick={() => setShowExperienceForm(false)}>
@@ -1324,237 +1826,6 @@ export default function CandidateDashboard() {
             )}
           </div>
         )}
-
-        {activeTab === 'video-cv' && (
-          <div>
-            <div style={{ marginBottom: '2rem' }}>
-              <h2 style={{ marginBottom: '0.5rem', color: 'var(--primary)' }}>
-                <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i>
-                Video CV Professional
-              </h2>
-              <p style={{ color: 'var(--text-secondary)' }}>
-                Registra un video CV professionale. Leggi il testo che scorre e guarda la telecamera.
-              </p>
-            </div>
-
-            {!isRecording && !videoUrl && (
-              <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
-                <div style={{ marginBottom: '2rem' }}>
-                  <label style={{ display: 'block', marginBottom: '1rem', fontWeight: '600', textAlign: 'left' }}>
-                    <i className="fas fa-scroll" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
-                    Testo Teleprompter (opzionale)
-                  </label>
-                  <textarea
-                    value={teleprompterText}
-                    onChange={(e) => setTeleprompterText(e.target.value)}
-                    placeholder="Inizia a parlare della tua esperienza in ambito professionale... focalizzati sulle tue soft skills e sui risultati raggiunti negli ultimi anni."
-                    rows={5}
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      border: '1px solid var(--border-light)',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '1rem',
-                      resize: 'vertical',
-                      fontFamily: 'inherit'
-                    }}
-                  />
-                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                    Questo testo scorrerà durante la registrazione per aiutarti a mantenere il discorso fluido.
-                  </p>
-                </div>
-                <button
-                  onClick={startVideoRecording}
-                  className="btn-submit"
-                  style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}
-                >
-                  <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i>
-                  Inizia Registrazione Video CV
-                </button>
-              </div>
-            )}
-
-            {isRecording && (
-              <div className="card" style={{ padding: '2rem' }}>
-                <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--primary)' }}>
-                  <i className="fas fa-circle" style={{ color: 'var(--error)', marginRight: '0.5rem', animation: 'pulse 1s infinite' }}></i>
-                  Registrazione in Corso
-                </h3>
-                
-                <div style={{ 
-                  position: 'relative', 
-                  width: '100%', 
-                  maxWidth: '800px', 
-                  margin: '0 auto',
-                  background: '#000',
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden'
-                }}>
-                  {/* Teleprompter */}
-                  {teleprompterText && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '20%',
-                      left: 0,
-                      width: '100%',
-                      height: '150px',
-                      background: 'rgba(0,0,0,0.7)',
-                      color: '#fff',
-                      padding: '20px',
-                      overflow: 'hidden',
-                      pointerEvents: 'none',
-                      zIndex: 10,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <div
-                        id="teleprompter-text"
-                        style={{
-                          fontSize: '1.5rem',
-                          fontWeight: '600',
-                          textAlign: 'center',
-                          transform: `translateY(${teleprompterPosition}px)`,
-                          whiteSpace: 'pre-wrap',
-                          wordWrap: 'break-word',
-                        }}
-                      >
-                        {teleprompterText}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <video
-                    id="video-preview"
-                    autoPlay
-                    muted
-                    playsInline
-                    style={{
-                      width: '100%',
-                      display: 'block',
-                      borderRadius: 'var(--radius-lg)',
-                    }}
-                  />
-                </div>
-
-                <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                  <button
-                    onClick={stopVideoRecording}
-                    className="btn-submit"
-                    style={{
-                      padding: '1rem 2rem',
-                      fontSize: '1.1rem',
-                      background: 'var(--error)',
-                    }}
-                  >
-                    <i className="fas fa-stop" style={{ marginRight: '0.5rem' }}></i>
-                    Termina Registrazione
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {videoUrl && !isRecording && (
-              <div className="card" style={{ padding: '2rem' }}>
-                <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: 'var(--primary)' }}>
-                  <i className="fas fa-check-circle" style={{ color: 'var(--success)', marginRight: '0.5rem' }}></i>
-                  Video CV Registrato
-                </h3>
-                
-                <div style={{ 
-                  width: '100%', 
-                  maxWidth: '800px', 
-                  margin: '0 auto 2rem',
-                  background: '#000',
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden'
-                }}>
-                  <video
-                    src={videoUrl}
-                    controls
-                    style={{
-                      width: '100%',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => {
-                      setVideoUrl(null);
-                      setRecordedChunks([]);
-                    }}
-                    className="btn-submit"
-                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-                  >
-                    <i className="fas fa-redo" style={{ marginRight: '0.5rem' }}></i>
-                    Registra Nuovo Video
-                  </button>
-                  <button
-                    onClick={saveVideoCV}
-                    className="btn-submit"
-                    disabled={uploadingVideo}
-                  >
-                    {uploadingVideo ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin" style={{ marginRight: '0.5rem' }}></i>
-                        Salvataggio...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-save" style={{ marginRight: '0.5rem' }}></i>
-                        Salva Video CV
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {user?.videoCvUrl && (
-              <div className="card" style={{ padding: '2rem', marginTop: '2rem' }}>
-                <h3 style={{ marginBottom: '1rem' }}>
-                  <i className="fas fa-video" style={{ marginRight: '0.5rem', color: 'var(--primary)' }}></i>
-                  Il Mio Video CV Attuale
-                </h3>
-                <div style={{ 
-                  width: '100%', 
-                  maxWidth: '800px', 
-                  margin: '0 auto',
-                  background: '#000',
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden'
-                }}>
-                  <video
-                    src={user.videoCvUrl}
-                    controls
-                    style={{
-                      width: '100%',
-                      display: 'block',
-                    }}
-                  />
-                </div>
-                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                  <a
-                    href={user.videoCvUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      color: 'var(--primary)',
-                      textDecoration: 'none',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
-                    Apri in nuova scheda
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
 
         {activeTab === 'applications' && (
           <div>
@@ -1663,6 +1934,34 @@ export default function CandidateDashboard() {
                 Visualizza Tutti i Messaggi
               </button>
             </div>
+            {applications.length > 0 && (
+              <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)' }}>
+                <h3 style={{ marginBottom: '0.75rem' }}>Aziende delle tue candidature</h3>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {Array.from(
+                    new Map(
+                      applications
+                        .filter((app: any) => app?.jobId?.companyId?._id)
+                        .map((app: any) => [app.jobId.companyId._id, app])
+                    ).values()
+                  ).map((app: any) => (
+                    <button
+                      key={app.jobId.companyId._id}
+                      onClick={() => router.push(`/messages/${app.jobId.companyId._id}?jobId=${app.jobId?._id}`)}
+                      style={{
+                        padding: '0.55rem 0.8rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-light)',
+                        background: 'var(--bg-secondary)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {app.jobId?.companyId?.companyName || app.jobId?.companyId?.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {messages.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)' }}>
                 <i className="fas fa-envelope" style={{ fontSize: '3rem', color: 'var(--text-tertiary)', marginBottom: '1rem' }}></i>
@@ -1732,8 +2031,9 @@ export default function CandidateDashboard() {
             )}
           </div>
         )}
+          </div>
+        </div>
       </div>
     </>
   );
 }
-

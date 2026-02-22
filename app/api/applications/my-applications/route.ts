@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         path: 'jobId',
         populate: {
           path: 'companyId',
-          select: 'name companyName email location',
+          select: 'name companyName email location companyLogoUrl profilePhotoUrl',
         },
       })
       .sort({ createdAt: -1 })
@@ -55,4 +55,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

@@ -171,9 +171,17 @@ export default function CandidateApplicationsPage() {
         ) : (
           <div style={{ display: 'grid', gap: '1rem' }}>
             {applications.map((app: any) => (
-              <div key={app._id} style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ flex: 1 }}>
+                <div key={app._id} style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ flex: 1, display: 'flex', gap: '0.75rem' }}>
+                    {(app.jobId?.companyId?.companyLogoUrl || app.jobId?.companyId?.profilePhotoUrl) && (
+                      <img
+                        src={app.jobId?.companyId?.companyLogoUrl || app.jobId?.companyId?.profilePhotoUrl}
+                        alt={app.jobId?.companyId?.companyName || app.jobId?.companyId?.name || 'Azienda'}
+                        style={{ width: '50px', height: '50px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--border-light)' }}
+                      />
+                    )}
+                    <div>
                     <h3 style={{ marginBottom: '0.5rem', color: 'var(--primary)' }}>
                       {app.jobId?.title || 'Job non trovato'}
                     </h3>
@@ -201,6 +209,7 @@ export default function CandidateApplicationsPage() {
                         day: 'numeric'
                       })}
                     </p>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                     <span style={{
@@ -258,4 +267,3 @@ export default function CandidateApplicationsPage() {
     </>
   );
 }
-

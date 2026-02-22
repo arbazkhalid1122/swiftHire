@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
             id: user._id,
             name: user.name,
             email: user.email,
+            profilePhotoUrl: user.profilePhotoUrl,
             isVerified: user.isVerified,
             role: user.role,
             userType: user.userType,
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
             id: user._id,
             name: user.name,
             email: user.email,
+            profilePhotoUrl: user.profilePhotoUrl,
             isVerified: user.isVerified,
             role: user.role,
             userType: user.userType,
@@ -125,4 +127,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

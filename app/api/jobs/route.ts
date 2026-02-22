@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     const location = searchParams.get('location');
     const jobType = searchParams.get('jobType');
+    const distanceKm = parseInt(searchParams.get('distanceKm') || '0', 10);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '12');
     const skip = (page - 1) * limit;
@@ -48,16 +49,31 @@ export async function GET(request: NextRequest) {
 
     const query = { $and: andConditions };
 
-    // Get total count for pagination
-    const totalCount = await Job.countDocuments(query);
+    let jobs: any[] = [];
+    let totalCount = 0;
 
-    // Fetch jobs with pagination
-    let jobs = await Job.find(query)
-      .populate('companyId', 'name companyName email location')
-      .sort({ viewCount: -1, createdAt: -1 }) // Sort by view count (most viewed first), then by creation date
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    // Distance heuristic: tighten location match when a smaller distance is selected.
+    if (distanceKm > 0 && location) {
+      const allJobs = await Job.find(query)
+        .populate('companyId', 'name companyName email location companyLogoUrl profilePhotoUrl')
+        .sort({ viewCount: -1, createdAt: -1 })
+        .lean();
+
+      const distanceFiltered = allJobs.filter((job: any) =>
+        matchesDistanceHeuristic(location, job.location || '', distanceKm)
+      );
+
+      totalCount = distanceFiltered.length;
+      jobs = distanceFiltered.slice(skip, skip + limit);
+    } else {
+      totalCount = await Job.countDocuments(query);
+      jobs = await Job.find(query)
+        .populate('companyId', 'name companyName email location companyLogoUrl profilePhotoUrl')
+        .sort({ viewCount: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+    }
 
     // Smart ranking: If user is authenticated and is a candidate, rank jobs by match
     if (auth) {
@@ -87,6 +103,31 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function matchesDistanceHeuristic(origin: string, destination: string, distanceKm: number): boolean {
+  const originParts = origin.toLowerCase().split(',').map(p => p.trim()).filter(Boolean);
+  const destinationParts = destination.toLowerCase().split(',').map(p => p.trim()).filter(Boolean);
+
+  const originCity = originParts[0] || '';
+  const destinationCity = destinationParts[0] || '';
+  const originRegion = originParts[1] || originCity;
+  const destinationRegion = destinationParts[1] || destinationCity;
+
+  if (!originCity || !destinationCity) {
+    return destination.toLowerCase().includes(origin.toLowerCase());
+  }
+
+  if (distanceKm <= 15) {
+    return destinationCity === originCity;
+  }
+  if (distanceKm <= 40) {
+    return destinationCity.includes(originCity) || originCity.includes(destinationCity);
+  }
+  if (distanceKm <= 70) {
+    return destinationRegion.includes(originRegion) || originRegion.includes(destinationRegion);
+  }
+  return destination.toLowerCase().includes(originCity);
 }
 
 // POST - Create a new job (companies only)
@@ -338,4 +379,3 @@ async function sendJobNotificationToCandidates(job: any) {
     console.error('Error sending job notifications:', error);
   }
 }
-

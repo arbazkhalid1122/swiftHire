@@ -60,6 +60,9 @@
   --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --control-height: 46px;
+  --control-height-sm: 40px;
+  --control-radius: 12px;
 }
 
 @theme inline {
@@ -88,6 +91,15 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+p, li, label, span {
+  line-height: 1.45;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 /* Animations */
@@ -291,7 +303,7 @@ header:hover {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all var(--transition-base);
-  padding: 1rem 1.125rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius-lg);
   border: none;
   background: transparent;
@@ -300,6 +312,8 @@ header:hover {
   overflow: hidden;
   min-width: fit-content;
   box-sizing: border-box;
+  min-height: var(--control-height);
+  line-height: 1.2;
 }
 
 .nav-links a::before {
@@ -331,7 +345,7 @@ header:hover {
 
 .btn-post, .btn-video {
   color: var(--text-primary) !important;
-  padding: 1rem 1.25rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius-lg);
   font-weight: 600;
   cursor: pointer;
@@ -348,6 +362,8 @@ header:hover {
   min-width: fit-content;
   white-space: nowrap;
   box-sizing: border-box;
+  min-height: var(--control-height);
+  line-height: 1.2;
 }
 
 .btn-post::before, .btn-video::before {
@@ -370,6 +386,19 @@ header:hover {
   color: var(--text-inverse) !important;
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+.nav-message-link {
+  font-weight: 600;
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-action-btn {
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
 }
 
 .user-avatar {
@@ -1085,19 +1114,24 @@ input, select, textarea {
   width: 100%;
   background: white;
   border: 2px solid var(--border-light);
-  padding: 0.875rem 1rem;
+  padding: 0.75rem 0.95rem;
   color: var(--text-primary);
-  border-radius: var(--radius-lg);
+  border-radius: var(--control-radius);
   font-size: 1rem;
   font-family: inherit;
   transition: all var(--transition-base);
   box-sizing: border-box;
 }
 
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+select {
+  min-height: var(--control-height);
+}
+
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 4px rgba(128, 0, 0, 0.12);
   transform: translateY(-1px);
 }
 
@@ -1108,7 +1142,7 @@ textarea {
 
 .btn-submit {
   width: 100%;
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   background: var(--gradient-primary);
   color: white;
   border: none;
@@ -1118,7 +1152,7 @@ textarea {
   font-size: 1rem;
   margin-top: 1.5rem;
   transition: all var(--transition-base);
-  border-radius: var(--radius-lg);
+  border-radius: var(--control-radius);
   box-shadow: var(--shadow-md);
   letter-spacing: 0.5px;
   position: relative;
@@ -1126,6 +1160,8 @@ textarea {
   min-width: fit-content;
   white-space: nowrap;
   box-sizing: border-box;
+  min-height: var(--control-height);
+  line-height: 1.2;
 }
 
 .btn-submit::before {
@@ -1639,8 +1675,9 @@ textarea {
   
   .btn-post,
   .btn-video {
-    padding: 10px 14px;
+    padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
+    min-height: var(--control-height-sm);
   }
   
   .user-avatar {

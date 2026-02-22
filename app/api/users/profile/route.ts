@@ -47,10 +47,17 @@ export async function GET(request: NextRequest) {
           companyName: user.companyName,
           companyDescription: user.companyDescription,
           companyWebsite: user.companyWebsite,
+          companyLogoUrl: user.companyLogoUrl,
+          companyCourses: user.companyCourses,
+          profilePhotoUrl: user.profilePhotoUrl ?? null,
+          cvProfile: user.userType === 'candidate' ? user.cvProfile : undefined,
           createdAt: user.createdAt,
         },
       },
-      { status: 200 }
+      {
+        status: 200,
+        headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+      }
     );
   } catch (error: any) {
     console.error('Get profile error:', error);
@@ -73,7 +80,27 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { name, phone, location, bio, cvUrl, videoCvUrl, education, skills, yearsOfExperience, languages, certifications, educationHistory, companyName, companyDescription, companyWebsite } = await request.json();
+    const {
+      name,
+      phone,
+      location,
+      bio,
+      cvUrl,
+      videoCvUrl,
+      education,
+      skills,
+      yearsOfExperience,
+      languages,
+      certifications,
+      educationHistory,
+      companyName,
+      companyDescription,
+      companyWebsite,
+      companyLogoUrl,
+      companyCourses,
+      profilePhotoUrl,
+      cvProfile,
+    } = await request.json();
 
     const user = await User.findById(auth.userId);
     if (!user) {
@@ -115,6 +142,12 @@ export async function PUT(request: NextRequest) {
     if (companyName !== undefined) user.companyName = companyName;
     if (companyDescription !== undefined) user.companyDescription = companyDescription;
     if (companyWebsite !== undefined) user.companyWebsite = companyWebsite;
+    if (companyLogoUrl !== undefined) user.companyLogoUrl = companyLogoUrl;
+    if (companyCourses !== undefined) user.companyCourses = companyCourses;
+    if (profilePhotoUrl !== undefined) user.profilePhotoUrl = profilePhotoUrl;
+    if (cvProfile !== undefined && user.userType === 'candidate') {
+      user.cvProfile = cvProfile;
+    }
 
     await user.save();
 
@@ -142,4 +175,3 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
-

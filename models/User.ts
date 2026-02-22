@@ -15,11 +15,40 @@ export interface IUser extends Document {
   companyName?: string;
   companyDescription?: string;
   companyWebsite?: string;
+  companyLogoUrl?: string;
+  companyCourses?: Array<{
+    title: string;
+    description?: string;
+    url?: string;
+  }>;
   // Candidate fields
   education?: string; // e.g., "Laurea", "Diploma"
   skills?: string[];
   cvUrl?: string;
   videoCvUrl?: string;
+  profilePhotoUrl?: string;
+  cvProfile?: {
+    headline?: string;
+    summary?: string;
+    desiredRole?: string;
+    dateOfBirth?: string;
+    nationality?: string;
+    linkedinUrl?: string;
+    portfolioUrl?: string;
+    githubUrl?: string;
+    expectedSalary?: string;
+    availability?: string;
+    preferredWorkMode?: string;
+    strengths?: string[];
+    achievements?: string[];
+    projects?: Array<{
+      name?: string;
+      role?: string;
+      description?: string;
+      technologies?: string;
+      link?: string;
+    }>;
+  };
   calculatedExperience?: number; // Calculated years of experience (non-overlapping)
   cvExtractedData?: {
     extractedAt: Date;
@@ -99,6 +128,24 @@ const UserSchema: Schema = new Schema(
       type: String,
       trim: true,
     },
+    companyLogoUrl: {
+      type: String,
+      trim: true,
+    },
+    companyCourses: [{
+      title: {
+        type: String,
+        trim: true,
+      },
+      description: {
+        type: String,
+        trim: true,
+      },
+      url: {
+        type: String,
+        trim: true,
+      },
+    }],
     // Candidate fields
     education: {
       type: String,
@@ -127,6 +174,32 @@ const UserSchema: Schema = new Schema(
     },
     videoCvUrl: {
       type: String,
+    },
+    profilePhotoUrl: {
+      type: String,
+      trim: true,
+    },
+    cvProfile: {
+      headline: String,
+      summary: String,
+      desiredRole: String,
+      dateOfBirth: String,
+      nationality: String,
+      linkedinUrl: String,
+      portfolioUrl: String,
+      githubUrl: String,
+      expectedSalary: String,
+      availability: String,
+      preferredWorkMode: String,
+      strengths: [String],
+      achievements: [String],
+      projects: [{
+        name: String,
+        role: String,
+        description: String,
+        technologies: String,
+        link: String,
+      }],
     },
     calculatedExperience: {
       type: Number,
@@ -169,4 +242,3 @@ UserSchema.methods.comparePassword = async function (candidatePassword: string):
 };
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
-

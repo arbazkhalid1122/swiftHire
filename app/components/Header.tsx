@@ -12,6 +12,7 @@ export default function Header() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -21,12 +22,23 @@ export default function Header() {
     }
   }, []);
 
+  // Refresh navbar user (e.g. after profile photo upload) when profile page signals update
   useEffect(() => {
-    // Close mobile menu when route changes
+    const onProfileUpdated = () => {
+      const token = localStorage.getItem('token');
+      if (token) fetchUserData(token);
+    };
+    window.addEventListener('profile-updated', onProfileUpdated);
+    return () => window.removeEventListener('profile-updated', onProfileUpdated);
+  }, []);
+
+  useEffect(() => {
     setMobileMenuOpen(false);
-    // Only refresh user data if we don't have user data yet
-    // Don't refresh on every route change to avoid excessive API calls
   }, [pathname]);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.profilePhotoUrl]);
 
   const fetchUserData = async (token: string) => {
     try {
@@ -34,11 +46,11 @@ export default function Header() {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+        cache: 'no-store',
       });
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
-        console.log('User data fetched:', data.user); // Debug log
       } else {
         // If unauthorized, clear auth state
         if (response.status === 401) {
@@ -115,17 +127,7 @@ export default function Header() {
               {user?.role !== 'admin' && (
               <Link 
                 href="/messages" 
-                className={isActive('/messages') ? 'active' : ''}
-                style={{ 
-                  color: 'var(--text-primary)', 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: 'var(--radius-lg)',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  position: 'relative'
-                }}
+                className={`${isActive('/messages') ? 'active' : ''} nav-message-link`}
               >
                 <i className="fas fa-envelope"></i>
                 Messaggi
@@ -150,21 +152,28 @@ export default function Header() {
                 </span>
               )}
               <Link href="/profile" className="user-avatar" title={user?.name || 'Profilo'}>
-                {user?.name?.charAt(0).toUpperCase() || <i className="fas fa-user"></i>}
+                {user?.profilePhotoUrl && !avatarLoadFailed ? (
+                  <img
+                    src={user.profilePhotoUrl}
+                    alt=""
+                    onError={() => setAvatarLoadFailed(true)}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  user?.name?.charAt(0).toUpperCase() || <i className="fas fa-user"></i>
+                )}
               </Link>
               <button
-                className="btn-video"
+                className="btn-video nav-action-btn"
                 onClick={handleLogout}
-                style={{ background: 'transparent', color: '#000', border: 'none', cursor: 'pointer' }}
               >
                 <i className="fas fa-sign-out-alt"></i> <span className="nav-text">Logout</span>
               </button>
             </>
           ) : (
             <button
-              className="btn-video"
+              className="btn-video nav-action-btn"
               onClick={() => setAuthModalOpen(true)}
-              style={{ background: 'transparent', color: '#000', border: 'none', cursor: 'pointer' }}
             >
               <i className="fas fa-sign-in-alt"></i> <span className="nav-text">Accedi</span>
             </button>
@@ -197,8 +206,13 @@ export default function Header() {
             </Link>
             {isAuthenticated ? (
               <>
-                <Link href="/profile" className={isActive('/profile') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>
-                  <i className="fas fa-user"></i> Profilo
+                <Link href="/profile" className={isActive('/profile') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {user?.profilePhotoUrl && !avatarLoadFailed ? (
+                    <img src={user.profilePhotoUrl} alt="" onError={() => setAvatarLoadFailed(true)} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <i className="fas fa-user"></i>
+                  )}
+                  <span>Profilo</span>
                 </Link>
                 {user?.role !== 'admin' && (
                 <Link 

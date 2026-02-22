@@ -26,11 +26,23 @@ export default function ProfilePage() {
     companyName: '',
     companyDescription: '',
     companyWebsite: '',
+    companyLogoUrl: '',
+    profilePhotoUrl: '',
+    companyCourses: [] as Array<{ title: string; description?: string; url?: string }>,
   });
   const [userType, setUserType] = useState<'company' | 'candidate' | null>(null);
   const [uploadingCV, setUploadingCV] = useState(false);
   const [cvUploadProgress, setCvUploadProgress] = useState('');
   const [extractedData, setExtractedData] = useState<any>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cvPdfModalOpen, setCvPdfModalOpen] = useState(false);
+  const [cvSections, setCvSections] = useState({
+    contact: true,
+    profile: true,
+    education: true,
+    experience: true,
+    skills: true,
+  });
 
   useEffect(() => {
     fetchProfile();
@@ -78,6 +90,9 @@ export default function ProfilePage() {
         companyName: data.user.companyName || '',
         companyDescription: data.user.companyDescription || '',
         companyWebsite: data.user.companyWebsite || '',
+        companyLogoUrl: data.user.companyLogoUrl || '',
+        profilePhotoUrl: data.user.profilePhotoUrl || '',
+        companyCourses: data.user.companyCourses || [],
       });
     } catch (err) {
       setError('Network error. Please try again.');
@@ -122,6 +137,7 @@ export default function ProfilePage() {
 
       setIsEditMode(false);
       showToast('Profilo aggiornato con successo!', 'success');
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
     } catch (err) {
       setError('Network error. Please try again.');
     } finally {
@@ -220,6 +236,177 @@ export default function ProfilePage() {
     }
   };
 
+  const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      showToast('Usa un\'immagine (JPEG, PNG, WebP o GIF)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Il file deve essere inferiore a 5MB', 'error');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/api/upload/profile-photo', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showToast(data.error || 'Errore nel caricamento della foto', 'error');
+        return;
+      }
+      setProfileData(prev => ({ ...prev, profilePhotoUrl: data.profilePhotoUrl }));
+      showToast('Foto profilo caricata con successo!', 'success');
+      fetchProfile();
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
+    } catch (err) {
+      showToast('Errore di rete durante il caricamento', 'error');
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleSavePhotoUrl = async () => {
+    const photoUrl = profileData.profilePhotoUrl?.trim();
+    if (!photoUrl) {
+      showToast('Inserisci un URL foto valido', 'error');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/');
+        return;
+      }
+
+      const response = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ profilePhotoUrl: photoUrl }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.error || 'Errore nel salvataggio URL foto', 'error');
+        return;
+      }
+
+      showToast('Foto profilo aggiornata!', 'success');
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
+      fetchProfile();
+    } catch {
+      showToast('Errore di rete nel salvataggio URL foto', 'error');
+    }
+  };
+
+  const handleDownloadCvPdf = async (sections: typeof cvSections) => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      const margin = 20;
+      const pageW = doc.internal.pageSize.getWidth();
+      const maxW = pageW - margin * 2;
+      let y = margin;
+      const lineHeight = 5.5;
+      const sectionSpacing = 8;
+      const headingSize = 11;
+      const bodySize = 10;
+
+      const drawSectionHeading = (title: string) => {
+        if (y > 275) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.3);
+        doc.line(margin, y, pageW - margin, y);
+        y += 4;
+        doc.setFontSize(headingSize);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(40, 40, 40);
+        doc.text(title, margin, y);
+        y += lineHeight + 3;
+      };
+
+      const addSection = (title: string, content: string) => {
+        if (!content?.trim()) return;
+        if (y > 270) {
+          doc.addPage();
+          y = margin;
+        }
+        drawSectionHeading(title);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(bodySize);
+        doc.setTextColor(60, 60, 60);
+        const lines = doc.splitTextToSize(content.trim(), maxW);
+        doc.text(lines, margin, y);
+        y += lines.length * lineHeight + sectionSpacing;
+      };
+
+      doc.setTextColor(30, 30, 30);
+
+      // Header: name as CV title
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text(profileData.name || 'Curriculum Vitae', margin, y);
+      y += lineHeight + 2;
+
+      // Contact line (if selected)
+      if (sections.contact) {
+        doc.setFontSize(bodySize);
+        doc.setFont('helvetica', 'normal');
+        const contact: string[] = [];
+        if (profileData.email) contact.push(profileData.email);
+        if (profileData.phone) contact.push(profileData.phone);
+        if (profileData.location) contact.push(profileData.location);
+        if (contact.length) {
+          doc.text(contact.join('  •  '), margin, y);
+          y += lineHeight + sectionSpacing;
+        }
+      }
+
+      y += 2;
+
+      if (sections.profile) addSection('Profilo professionale', profileData.bio || '');
+      if (sections.education) addSection('Formazione', profileData.education || '');
+      if (sections.experience && profileData.yearsOfExperience) {
+        addSection('Esperienza', `${profileData.yearsOfExperience} anni di esperienza`);
+      }
+      if (sections.skills) addSection('Competenze', profileData.skills || '');
+
+      const filename = `${(profileData.name || 'CV').replace(/\s+/g, '_')}_CV.pdf`;
+      doc.save(filename);
+      setCvPdfModalOpen(false);
+      showToast('CV scaricato in PDF!', 'success');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      showToast('Errore durante la generazione del PDF', 'error');
+    }
+  };
+
+  const toggleCvSection = (key: keyof typeof cvSections) => {
+    setCvSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   if (loading) {
     return (
       <>
@@ -278,6 +465,63 @@ export default function ProfilePage() {
             </div>
 
             <div className="form-row">
+              <div>
+                <label>Foto Profilo</label>
+                {profileData.profilePhotoUrl && (
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <img
+                      src={profileData.profilePhotoUrl}
+                      alt="Anteprima"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border-light)' }}
+                    />
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                  <label
+                    htmlFor="profile-photo-upload"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'var(--primary)',
+                      color: 'white',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: uploadingPhoto ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {uploadingPhoto ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-upload"></i>}
+                    {uploadingPhoto ? 'Caricamento...' : 'Carica immagine'}
+                  </label>
+                  <input
+                    id="profile-photo-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleProfilePhotoUpload}
+                    disabled={uploadingPhoto}
+                    style={{ display: 'none' }}
+                  />
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>oppure URL:</span>
+                </div>
+                <input
+                  type="url"
+                  name="profilePhotoUrl"
+                  value={profileData.profilePhotoUrl}
+                  onChange={handleChange}
+                  placeholder="https://..."
+                  style={{ marginTop: '0.5rem', width: '100%' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleSavePhotoUrl}
+                  className="btn-submit"
+                  style={{ width: 'auto', marginTop: '0.5rem' }}
+                >
+                  Salva Foto URL
+                </button>
+              </div>
               <div>
                 <label>Telefono</label>
                 <input
@@ -446,21 +690,47 @@ export default function ProfilePage() {
                       />
                     )}
                     {profileData.cvUrl && (
-                      <a
-                        href={profileData.cvUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: 'inline-block',
-                          marginTop: '0.5rem',
-                          color: 'var(--primary)',
-                          textDecoration: 'none',
-                        }}
-                      >
-                        <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
-                        Visualizza CV
-                      </a>
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                        <a
+                          href={profileData.cvUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: 'var(--primary)',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <i className="fas fa-external-link-alt" style={{ marginRight: '0.5rem' }}></i>
+                          Visualizza CV
+                        </a>
+                        <a
+                          href={profileData.cvUrl}
+                          download
+                          style={{
+                            color: 'var(--success)',
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <i className="fas fa-download" style={{ marginRight: '0.5rem' }}></i>
+                          Scarica CV PDF
+                        </a>
+                      </div>
                     )}
+                    <div style={{ marginTop: '1rem' }}>
+                      <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                        Genera un CV in PDF dal profilo. Scegli cosa includere e scarica. Salva le modifiche prima di generare.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCvPdfModalOpen(true)}
+                        className="btn-submit"
+                        style={{ width: 'auto', padding: '0.6rem 1.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        <i className="fas fa-file-pdf"></i>
+                        Scarica CV in PDF
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label>URL Video CV (YouTube, Vimeo, ecc.)</label>
@@ -527,6 +797,17 @@ export default function ProfilePage() {
                     placeholder="https://..."
                   />
                 </div>
+                <div>
+                  <label>Logo Azienda (URL immagine)</label>
+                  <input
+                    type="url"
+                    name="companyLogoUrl"
+                    value={profileData.companyLogoUrl}
+                    onChange={handleChange}
+                    disabled={!isEditMode}
+                    placeholder="https://..."
+                  />
+                </div>
               </>
             )}
 
@@ -536,6 +817,116 @@ export default function ProfilePage() {
               </button>
             )}
           </form>
+
+          {/* CV PDF options modal */}
+          {cvPdfModalOpen && (
+            <div
+              className="card"
+              style={{
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 1000,
+                maxWidth: '420px',
+                width: '90%',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Cosa includere nel CV?</h3>
+                <button
+                  type="button"
+                  onClick={() => setCvPdfModalOpen(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', padding: '0.25rem' }}
+                  aria-label="Chiudi"
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                Seleziona le sezioni da includere nel PDF. L&apos;ordine sarà: contatti, profilo, formazione, esperienza, competenze.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={cvSections.contact}
+                    onChange={() => toggleCvSection('contact')}
+                  />
+                  <span>Contatti (nome, email, telefono, località)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={cvSections.profile}
+                    onChange={() => toggleCvSection('profile')}
+                  />
+                  <span>Profilo professionale (biografia)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={cvSections.education}
+                    onChange={() => toggleCvSection('education')}
+                  />
+                  <span>Formazione (titolo di studio)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={cvSections.experience}
+                    onChange={() => toggleCvSection('experience')}
+                  />
+                  <span>Esperienza (anni di esperienza)</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={cvSections.skills}
+                    onChange={() => toggleCvSection('skills')}
+                  />
+                  <span>Competenze</span>
+                </label>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setCvPdfModalOpen(false)}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-secondary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadCvPdf(cvSections)}
+                  className="btn-submit"
+                  style={{ padding: '0.6rem 1.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <i className="fas fa-file-pdf"></i>
+                  Genera PDF
+                </button>
+              </div>
+            </div>
+          )}
+          {cvPdfModalOpen && (
+            <div
+              onClick={() => setCvPdfModalOpen(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.4)',
+                zIndex: 999,
+              }}
+              aria-hidden="true"
+            />
+          )}
         </div>
       </div>
     </>
