@@ -5,10 +5,11 @@ import { existsSync } from 'fs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { verifyAuth } from '@/middleware/auth';
+import { uploadToCloudinary, isCloudinaryConfigured } from '@/lib/cloudinary';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,26 +53,38 @@ export async function POST(request: NextRequest) {
 
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: 'File size must be less than 5MB' },
+        { error: 'File size must be less than 2MB' },
         { status: 400 }
       );
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profile-photos');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-
     const safeExt = ALLOWED_EXT.includes(ext) ? ext : 'jpg';
     const filename = `${user._id}_${Date.now()}.${safeExt}`;
-    const filepath = join(uploadsDir, filename);
+    const contentType = file.type || `image/${safeExt}`;
 
-    await writeFile(filepath, buffer);
+    let profilePhotoUrl: string;
 
-    const profilePhotoUrl = `/uploads/profile-photos/${filename}`;
+    if (isCloudinaryConfigured()) {
+      const url = await uploadToCloudinary(buffer, 'profile-photos', filename, 'image', contentType);
+      if (!url) {
+        return NextResponse.json(
+          { error: 'Upload failed' },
+          { status: 500 }
+        );
+      }
+      profilePhotoUrl = url;
+    } else {
+      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profile-photos');
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true });
+      }
+      const filepath = join(uploadsDir, filename);
+      await writeFile(filepath, buffer);
+      profilePhotoUrl = `/uploads/profile-photos/${filename}`;
+    }
+
     await User.findByIdAndUpdate(auth.userId, { profilePhotoUrl });
 
     return NextResponse.json(

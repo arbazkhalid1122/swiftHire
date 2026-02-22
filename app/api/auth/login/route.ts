@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
           id: user._id,
           name: user.name,
           email: user.email,
-          profilePhotoUrl: user.profilePhotoUrl,
+          profilePhotoUrl: user.profilePhotoUrl ?? null,
           isVerified: user.isVerified,
           role: user.role,
           userType: user.userType,

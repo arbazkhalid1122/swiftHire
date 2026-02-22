@@ -36,9 +36,7 @@ export default function Header() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  const profilePhotoSrc = user?.id && typeof window !== 'undefined'
-    ? (localStorage.getItem(`profilePhoto_${user.id}`) || user.profilePhotoUrl)
-    : user?.profilePhotoUrl;
+  const profilePhotoSrc = user?.profilePhotoUrl;
 
   useEffect(() => {
     setAvatarLoadFailed(false);

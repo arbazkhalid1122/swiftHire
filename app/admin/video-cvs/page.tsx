@@ -19,6 +19,7 @@ export default function AdminVideoCVs() {
 
   useEffect(() => {
     if (isAdmin) {
+      setLoading(true);
       fetchVideoCVs();
     }
   }, [isAdmin]);
@@ -61,12 +62,25 @@ export default function AdminVideoCVs() {
 
   const fetchVideoCVs = async () => {
     try {
-      // TODO: Implement API endpoint for fetching video CVs
-      // For now, using mock data
-      setVideoCVs([]);
-      setLoading(false);
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const url = searchTerm
+        ? `/api/admin/video-cvs?search=${encodeURIComponent(searchTerm)}`
+        : '/api/admin/video-cvs';
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        showToast('Failed to fetch video CVs', 'error');
+        setVideoCVs([]);
+        return;
+      }
+      const data = await response.json();
+      setVideoCVs(data.videoCVs || []);
     } catch (err) {
       showToast('Failed to fetch video CVs', 'error');
+      setVideoCVs([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -183,16 +197,19 @@ export default function AdminVideoCVs() {
                   e.currentTarget.style.boxShadow = 'none';
                 }}
                 >
-                  <div style={{
-                    position: 'relative',
-                    width: '100%',
-                    paddingTop: '56.25%',
-                    background: '#000',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => {
-                    showToast('Video player coming soon', 'info');
-                  }}
+                  <a
+                    href={videoCV.videoCvUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      position: 'relative',
+                      display: 'block',
+                      width: '100%',
+                      paddingTop: '56.25%',
+                      background: '#000',
+                      cursor: 'pointer',
+                      textDecoration: 'none'
+                    }}
                   >
                     <div style={{
                       position: 'absolute',
@@ -218,7 +235,7 @@ export default function AdminVideoCVs() {
                         }}
                       />
                     )}
-                  </div>
+                  </a>
                   <div style={{ padding: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                       <div style={{
@@ -249,10 +266,10 @@ export default function AdminVideoCVs() {
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        onClick={() => {
-                          showToast('Video player coming soon', 'info');
-                        }}
+                      <a
+                        href={videoCV.videoCvUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         style={{
                           flex: 1,
                           padding: '0.75rem',
@@ -262,16 +279,17 @@ export default function AdminVideoCVs() {
                           borderRadius: 'var(--radius)',
                           cursor: 'pointer',
                           fontSize: '0.875rem',
-                          fontWeight: '600'
+                          fontWeight: '600',
+                          textAlign: 'center' as const,
+                          textDecoration: 'none',
+                          display: 'inline-block'
                         }}
                       >
                         <i className="fas fa-play" style={{ marginRight: '0.5rem' }}></i>
                         Watch Video
-                      </button>
-                      <button
-                        onClick={() => {
-                          router.push(`/admin/candidates/${videoCV.candidateId}`);
-                        }}
+                      </a>
+                      <a
+                        href={videoCV.candidateEmail ? `mailto:${videoCV.candidateEmail}` : '#'}
                         style={{
                           padding: '0.75rem',
                           background: '#666',
@@ -279,11 +297,16 @@ export default function AdminVideoCVs() {
                           border: 'none',
                           borderRadius: 'var(--radius)',
                           cursor: 'pointer',
-                          fontSize: '0.875rem'
+                          fontSize: '0.875rem',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
                         }}
+                        title="Email candidate"
                       >
-                        <i className="fas fa-user"></i>
-                      </button>
+                        <i className="fas fa-envelope"></i>
+                      </a>
                     </div>
                   </div>
                 </div>

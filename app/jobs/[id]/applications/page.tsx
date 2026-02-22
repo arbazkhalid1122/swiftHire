@@ -290,8 +290,8 @@ export default function JobApplicationsPage() {
                         Visualizza CV
                       </a>
                     )}
-                    {app.videoCvUrl && (
-                      <a href={app.videoCvUrl} target="_blank" rel="noopener noreferrer" className="btn-submit" style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}>
+                    {(app.videoCvUrl || app.candidateId?.videoCvUrl) && (
+                      <a href={app.videoCvUrl || app.candidateId?.videoCvUrl} target="_blank" rel="noopener noreferrer" className="btn-submit" style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}>
                         <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i>
                         Video CV
                       </a>

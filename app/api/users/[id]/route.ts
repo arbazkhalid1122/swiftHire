@@ -36,10 +36,10 @@ export async function GET(
         name: user.name,
         email: user.email,
         companyName: user.companyName,
-        companyLogoUrl: user.companyLogoUrl,
+        companyLogoUrl: user.companyLogoUrl ?? null,
         userType: user.userType,
         location: user.location,
-        profilePhotoUrl: user.profilePhotoUrl,
+        profilePhotoUrl: user.profilePhotoUrl ?? null,
       },
     }, { status: 200 });
   } catch (error: any) {

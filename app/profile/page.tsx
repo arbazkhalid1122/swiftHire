@@ -43,9 +43,6 @@ export default function ProfilePage() {
     experience: true,
     skills: true,
   });
-  const [userId, setUserId] = useState<string | null>(null);
-
-  const PROFILE_PHOTO_KEY = (id: string) => `profilePhoto_${id}`;
   const MAX_PHOTO_SIZE = 2 * 1024 * 1024; // 2 MB
 
   useEffect(() => {
@@ -80,8 +77,6 @@ export default function ProfilePage() {
       }
 
       setUserType(data.user.userType);
-      setUserId(data.user.id ?? null);
-      const localPhoto = data.user.id ? localStorage.getItem(`profilePhoto_${data.user.id}`) : null;
       setProfileData({
         name: data.user.name || '',
         email: data.user.email || '',
@@ -97,7 +92,7 @@ export default function ProfilePage() {
         companyDescription: data.user.companyDescription || '',
         companyWebsite: data.user.companyWebsite || '',
         companyLogoUrl: data.user.companyLogoUrl || '',
-        profilePhotoUrl: localPhoto || '',
+        profilePhotoUrl: data.user.profilePhotoUrl || '',
         companyCourses: data.user.companyCourses || [],
       });
     } catch (err) {
@@ -119,14 +114,13 @@ export default function ProfilePage() {
         return;
       }
 
-      const { profilePhotoUrl: _photo, ...dataToSave } = profileData;
       const response = await fetch('/api/users/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(dataToSave),
+        body: JSON.stringify(profileData),
       });
 
       const data = await response.json();
@@ -243,7 +237,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -259,34 +253,34 @@ export default function ProfilePage() {
       return;
     }
 
-    const uid = userId || localStorage.getItem('userId');
-    if (!uid) {
-      showToast('Effettua l\'accesso per caricare una foto', 'error');
-      e.target.value = '';
-      return;
-    }
-
     setUploadingPhoto(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      try {
-        localStorage.setItem(PROFILE_PHOTO_KEY(uid), dataUrl);
-        setProfileData(prev => ({ ...prev, profilePhotoUrl: dataUrl }));
-        showToast('Foto profilo salvata!', 'success');
-        if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
-      } catch (err) {
-        showToast('Spazio insufficiente in memoria locale', 'error');
-      } finally {
-        setUploadingPhoto(false);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/');
+        return;
       }
-    };
-    reader.onerror = () => {
-      showToast('Errore nella lettura del file', 'error');
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/api/upload/profile-photo', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showToast(data.error || 'Errore nel caricamento della foto', 'error');
+        return;
+      }
+      setProfileData(prev => ({ ...prev, profilePhotoUrl: data.profilePhotoUrl }));
+      showToast('Foto profilo caricata con successo!', 'success');
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
+    } catch (err) {
+      showToast('Errore di rete durante il caricamento', 'error');
+    } finally {
       setUploadingPhoto(false);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+      e.target.value = '';
+    }
   };
 
   const handleDownloadCvPdf = async (sections: typeof cvSections) => {
@@ -449,7 +443,7 @@ export default function ProfilePage() {
                   </div>
                 )}
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  Max 2 MB. L&apos;immagine viene salvata localmente nel browser.
+                  Max 2 MB. Salvata su Cloudinary.
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                   <label

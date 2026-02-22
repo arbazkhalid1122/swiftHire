@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { verifyAuth } from '@/middleware/auth';
+import { uploadToCloudinary, isCloudinaryConfigured } from '@/lib/cloudinary';
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,29 +55,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'video-cvs');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-
-    // Generate unique filename
     const timestamp = Date.now();
     const ext = file.name.split('.').pop() || 'webm';
     const filename = `${user._id}_${timestamp}.${ext}`;
-    const filepath = join(uploadsDir, filename);
+    const contentType = file.type || 'video/webm';
 
-    // Save file
-    await writeFile(filepath, buffer);
+    let videoCvUrl: string;
 
-    // Generate public URL
-    const videoCvUrl = `/uploads/video-cvs/${filename}`;
+    if (isCloudinaryConfigured()) {
+      const url = await uploadToCloudinary(buffer, 'video-cvs', filename, 'video', contentType);
+      if (!url) {
+        return NextResponse.json(
+          { error: 'Upload failed' },
+          { status: 500 }
+        );
+      }
+      videoCvUrl = url;
+    } else {
+      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'video-cvs');
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true });
+      }
+      const filepath = join(uploadsDir, filename);
+      await writeFile(filepath, buffer);
+      videoCvUrl = `/uploads/video-cvs/${filename}`;
+    }
 
-    // Update user profile with video CV URL
     user.videoCvUrl = videoCvUrl;
     await user.save();
 

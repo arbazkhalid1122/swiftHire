@@ -214,15 +214,15 @@ export default function AdminJobDetailPage() {
                       <p style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>{app.coverLetter}</p>
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {app.cvUrl && (
                       <a href={app.cvUrl} target="_blank" rel="noopener noreferrer" className="btn-submit" style={{ fontSize: '0.875rem' }}>
                         <i className="fas fa-file-pdf" style={{ marginRight: '0.5rem' }}></i>
                         Visualizza CV
                       </a>
                     )}
-                    {app.videoCvUrl && (
-                      <a href={app.videoCvUrl} target="_blank" rel="noopener noreferrer" className="btn-submit" style={{ fontSize: '0.875rem' }}>
+                    {(app.videoCvUrl || app.candidateId?.videoCvUrl) && (
+                      <a href={app.videoCvUrl || app.candidateId?.videoCvUrl} target="_blank" rel="noopener noreferrer" className="btn-submit" style={{ fontSize: '0.875rem' }}>
                         <i className="fas fa-video" style={{ marginRight: '0.5rem' }}></i>
                         Video CV
                       </a>
