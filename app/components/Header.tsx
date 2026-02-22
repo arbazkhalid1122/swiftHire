@@ -36,9 +36,13 @@ export default function Header() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  const profilePhotoSrc = user?.id && typeof window !== 'undefined'
+    ? (localStorage.getItem(`profilePhoto_${user.id}`) || user.profilePhotoUrl)
+    : user?.profilePhotoUrl;
+
   useEffect(() => {
     setAvatarLoadFailed(false);
-  }, [user?.profilePhotoUrl]);
+  }, [profilePhotoSrc]);
 
   const fetchUserData = async (token: string) => {
     try {
@@ -152,9 +156,9 @@ export default function Header() {
                 </span>
               )}
               <Link href="/profile" className="user-avatar" title={user?.name || 'Profilo'}>
-                {user?.profilePhotoUrl && !avatarLoadFailed ? (
+                {profilePhotoSrc && !avatarLoadFailed ? (
                   <img
-                    src={user.profilePhotoUrl}
+                    src={profilePhotoSrc}
                     alt=""
                     onError={() => setAvatarLoadFailed(true)}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -207,8 +211,8 @@ export default function Header() {
             {isAuthenticated ? (
               <>
                 <Link href="/profile" className={isActive('/profile') ? 'active' : ''} onClick={() => setMobileMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  {user?.profilePhotoUrl && !avatarLoadFailed ? (
-                    <img src={user.profilePhotoUrl} alt="" onError={() => setAvatarLoadFailed(true)} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  {profilePhotoSrc && !avatarLoadFailed ? (
+                    <img src={profilePhotoSrc} alt="" onError={() => setAvatarLoadFailed(true)} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                   ) : (
                     <i className="fas fa-user"></i>
                   )}

@@ -43,6 +43,10 @@ export default function ProfilePage() {
     experience: true,
     skills: true,
   });
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const PROFILE_PHOTO_KEY = (id: string) => `profilePhoto_${id}`;
+  const MAX_PHOTO_SIZE = 2 * 1024 * 1024; // 2 MB
 
   useEffect(() => {
     fetchProfile();
@@ -76,6 +80,8 @@ export default function ProfilePage() {
       }
 
       setUserType(data.user.userType);
+      setUserId(data.user.id ?? null);
+      const localPhoto = data.user.id ? localStorage.getItem(`profilePhoto_${data.user.id}`) : null;
       setProfileData({
         name: data.user.name || '',
         email: data.user.email || '',
@@ -91,7 +97,7 @@ export default function ProfilePage() {
         companyDescription: data.user.companyDescription || '',
         companyWebsite: data.user.companyWebsite || '',
         companyLogoUrl: data.user.companyLogoUrl || '',
-        profilePhotoUrl: data.user.profilePhotoUrl || '',
+        profilePhotoUrl: localPhoto || '',
         companyCourses: data.user.companyCourses || [],
       });
     } catch (err) {
@@ -113,13 +119,14 @@ export default function ProfilePage() {
         return;
       }
 
+      const { profilePhotoUrl: _photo, ...dataToSave } = profileData;
       const response = await fetch('/api/users/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(profileData),
+        body: JSON.stringify(dataToSave),
       });
 
       const data = await response.json();
@@ -236,86 +243,50 @@ export default function ProfilePage() {
     }
   };
 
-  const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowed.includes(file.type)) {
       showToast('Usa un\'immagine (JPEG, PNG, WebP o GIF)', 'error');
+      e.target.value = '';
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Il file deve essere inferiore a 5MB', 'error');
+    if (file.size > MAX_PHOTO_SIZE) {
+      showToast('L\'immagine deve essere inferiore a 2 MB', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const uid = userId || localStorage.getItem('userId');
+    if (!uid) {
+      showToast('Effettua l\'accesso per caricare una foto', 'error');
+      e.target.value = '';
       return;
     }
 
     setUploadingPhoto(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        router.push('/');
-        return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      try {
+        localStorage.setItem(PROFILE_PHOTO_KEY(uid), dataUrl);
+        setProfileData(prev => ({ ...prev, profilePhotoUrl: dataUrl }));
+        showToast('Foto profilo salvata!', 'success');
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
+      } catch (err) {
+        showToast('Spazio insufficiente in memoria locale', 'error');
+      } finally {
+        setUploadingPhoto(false);
       }
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await fetch('/api/upload/profile-photo', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        showToast(data.error || 'Errore nel caricamento della foto', 'error');
-        return;
-      }
-      setProfileData(prev => ({ ...prev, profilePhotoUrl: data.profilePhotoUrl }));
-      showToast('Foto profilo caricata con successo!', 'success');
-      fetchProfile();
-      if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
-    } catch (err) {
-      showToast('Errore di rete durante il caricamento', 'error');
-    } finally {
+    };
+    reader.onerror = () => {
+      showToast('Errore nella lettura del file', 'error');
       setUploadingPhoto(false);
-      e.target.value = '';
-    }
-  };
-
-  const handleSavePhotoUrl = async () => {
-    const photoUrl = profileData.profilePhotoUrl?.trim();
-    if (!photoUrl) {
-      showToast('Inserisci un URL foto valido', 'error');
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        router.push('/');
-        return;
-      }
-
-      const response = await fetch('/api/users/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ profilePhotoUrl: photoUrl }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        showToast(data.error || 'Errore nel salvataggio URL foto', 'error');
-        return;
-      }
-
-      showToast('Foto profilo aggiornata!', 'success');
-      if (typeof window !== 'undefined') window.dispatchEvent(new Event('profile-updated'));
-      fetchProfile();
-    } catch {
-      showToast('Errore di rete nel salvataggio URL foto', 'error');
-    }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleDownloadCvPdf = async (sections: typeof cvSections) => {
@@ -477,6 +448,9 @@ export default function ProfilePage() {
                     />
                   </div>
                 )}
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                  Max 2 MB. L&apos;immagine viene salvata localmente nel browser.
+                </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                   <label
                     htmlFor="profile-photo-upload"
@@ -503,24 +477,7 @@ export default function ProfilePage() {
                     disabled={uploadingPhoto}
                     style={{ display: 'none' }}
                   />
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>oppure URL:</span>
                 </div>
-                <input
-                  type="url"
-                  name="profilePhotoUrl"
-                  value={profileData.profilePhotoUrl}
-                  onChange={handleChange}
-                  placeholder="https://..."
-                  style={{ marginTop: '0.5rem', width: '100%' }}
-                />
-                <button
-                  type="button"
-                  onClick={handleSavePhotoUrl}
-                  className="btn-submit"
-                  style={{ width: 'auto', marginTop: '0.5rem' }}
-                >
-                  Salva Foto URL
-                </button>
               </div>
               <div>
                 <label>Telefono</label>
